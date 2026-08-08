@@ -1,0 +1,87 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT Ctrl+Enter, Screenshot, Tab URL & Page Tools",
+  "version": "1.29.0",
+  "description": "ChatGPT Ctrl+Enter and widths, per-source media speed, multi-tab YouTube transcripts, screenshots, tab URLs, and conservative page tools.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "debugger",
+    "downloads",
+    "tabs",
+    "clipboardWrite",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon_16.png",
+    "32": "icons/icon_32.png",
+    "48": "icons/icon_48.png",
+    "128": "icons/icon_128.png"
+  },
+  "action": {
+    "default_title": "ChatGPT 단축키와 너비, 유튜브 전체 자막, 미디어 재생 속도, 페이지 도구, 탭 URL 복사 및 웹페이지 제한 해제",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon_16.png",
+      "32": "icons/icon_32.png",
+      "48": "icons/icon_48.png",
+      "128": "icons/icon_128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "content_script.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "file:///*"
+      ],
+      "js": [
+        "media_controller.js"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true,
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "element_eraser_restore.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "right_click.js"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true,
+      "run_at": "document_start"
+    }
+  ]
+}
