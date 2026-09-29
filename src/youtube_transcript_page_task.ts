@@ -1,0 +1,2551 @@
+"use strict";
+
+/** Serialized into MAIN independently; cancellation never receives extension capabilities. */
+function abortYouTubeCaptionTask(taskId: string): void {
+  if (!/^[a-f0-9-]{36}$/i.test(taskId)) return;
+  const scope = globalThis as typeof globalThis & { __browserToolboxCaptionTasksV1?: Map<string, AbortController | number> };
+  const registry = scope.__browserToolboxCaptionTasksV1 ?? new Map<string, AbortController | number>();
+  const controller = registry.get(taskId);
+  if (controller instanceof AbortController) controller.abort(new Error("자막 작업을 취소했습니다."));
+  else if (controller === undefined && registry.size < 64) {
+    // Injection and cancellation can cross. A short-lived tombstone also cancels a late start.
+    scope.__browserToolboxCaptionTasksV1 = registry;
+    registry.set(taskId, window.setTimeout(() => {
+      registry.delete(taskId);
+      if (!registry.size && scope.__browserToolboxCaptionTasksV1 === registry) delete scope.__browserToolboxCaptionTasksV1;
+    }, 60_000));
+  }
+}
+
+async function youtubeTranscriptPageTask(rawTask: unknown) {
+  "use strict";
+
+  interface RawTrack { baseUrl?: string; languageCode?: string; name?: unknown; kind?: string; vssId?: string; vss_id?: string; isTranslatable?: boolean; isDefault?: boolean; translationLanguage?: string | { languageCode?: string }; translationLanguageCode?: string; }
+  interface PlayerResponse { videoDetails?: { videoId?: string; title?: string }; currentVideoEndpoint?: { watchEndpoint?: { videoId?: string } }; captions?: { playerCaptionsTracklistRenderer?: { captionTracks?: RawTrack[]; translationLanguages?: Array<{ languageCode?: string; languageName?: unknown }> } }; microformat?: { playerMicroformatRenderer?: { liveBroadcastDetails?: { isLiveNow?: boolean } } }; }
+  interface YouTubePlayer extends HTMLElement { getPlayerResponse?: () => unknown; getVideoData?: () => { video_id?: string; videoId?: string } | null; getOption?: (moduleName: string, optionName: string) => unknown; setOption?: (moduleName: string, optionName: string, value: unknown) => void; isModuleLoaded?: (moduleName: string) => boolean; loadModule?: (moduleName: string) => void; unloadModule?: (moduleName: string) => void; }
+  interface Candidate { response: PlayerResponse; videoId: string; score: number; source: string; player: YouTubePlayer | null; video: HTMLVideoElement | null; }
+  interface CaptionEntry { startMs: number; durationMs: number; text: string; }
+  interface FetchedCaptions { entries: CaptionEntry[]; format?: string; url?: string; status?: number; }
+  type CaptionInfo = ReturnType<typeof buildCaptionInfo>;
+  type PublicTrack = CaptionInfo["tracks"][number];
+  type InteractionState = ReturnType<typeof captureYouTubeInteractionState>;
+  type RequestCapture = ReturnType<typeof createActualYouTubeRequestCapture>;
+  type CleanupOptions = { restoreCaptionButton?: boolean; restoreNativeTrackModes?: boolean };
+  interface SyncedManager { cleaned: boolean; player: YouTubePlayer; video: HTMLVideoElement; track: TextTrack; videoId: string; sourceTrackId: string; sourceTrackLabel: string; sourceLanguageCode: string; translationLanguageCode: string; translationLanguageName: string; format: string; installedAt: number; captionButtonWasPressed: boolean | null; nativeTrackModes: Map<TextTrack, TextTrackMode>; intervalId: number; pageHideListener: () => void; navigateListener: () => void; pageDataListener: () => void; metadataListener: () => void; textTrackListener: () => void; captionButtonObserver: MutationObserver | null; observedCaptionButton: HTMLElement | null; enforcing: boolean; enforceTrackModes: () => void; cleanup: (options?: CleanupOptions) => Promise<void>; observeCaptionButton: () => void; }
+  interface SyncedRoot { version: number; current: SyncedManager | null; trackByVideo: WeakMap<HTMLVideoElement, TextTrack>; }
+  const pageScope = globalThis as typeof globalThis & { __browserToolboxYouTubeSyncedCaptionsV1?: SyncedRoot; ytInitialPlayerResponse?: unknown; ytplayer?: { config?: { args?: { player_response?: unknown } } }; ytcfg?: { get?: (key: string) => unknown } };
+  const task = rawTask && typeof rawTask === "object" ? rawTask as Record<string, unknown> : {};
+  function record(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" ? value as Record<string, unknown> : {};
+  }
+  const CAPTION_REQUEST_TIMEOUT_MS = 12000;
+  const PANEL_REQUEST_TIMEOUT_MS = 10000;
+  const SYNCED_CAPTION_STATE_KEY = "__browserToolboxYouTubeSyncedCaptionsV1";
+  const SYNCED_CAPTION_STATE_VERSION = 2;
+  const SYNCED_CAPTION_TRACK_LABEL = "Browser Toolbox 동기화 자막";
+  const SYNCED_CAPTION_CHANGED_EVENT = "browser-toolbox-youtube-synced-caption-changed";
+  const MAX_SYNCED_CAPTION_CUES = 20000;
+  const SYNCED_CAPTION_VERIFY_INTERVAL_MS = 1200;
+  let captionTextRequestSequence = 0;
+  const MAX_CAPTION_BODY_BYTES = 8 * 1024 * 1024;
+  const taskAbort = new AbortController();
+  let restoringInteraction = false;
+  let taskFinished = false;
+  const taskId = typeof task.taskId === "string" ? task.taskId : "";
+  const taskRegistryKey = "__browserToolboxCaptionTasksV1";
+  const taskScope = globalThis as typeof globalThis & {
+    __browserToolboxCaptionTasksV1?: Map<string, AbortController | number>;
+  };
+  const taskRegistry = taskScope[taskRegistryKey] ?? new Map<string, AbortController | number>();
+  if (taskId) {
+    taskScope[taskRegistryKey] = taskRegistry;
+    const cancelledBeforeStart = taskRegistry.get(taskId);
+    if (typeof cancelledBeforeStart === "number") {
+      clearTimeout(cancelledBeforeStart);
+      taskAbort.abort(new Error("자막 작업을 취소했습니다."));
+    }
+    taskRegistry.set(taskId, taskAbort);
+  }
+  const requestedDeadline = Number(task.deadline);
+  const deadline = Math.min(Date.now() + 45_000, Number.isFinite(requestedDeadline) ? requestedDeadline : Infinity);
+  const taskTimer = setTimeout(() => taskAbort.abort(new Error("자막 처리 시간이 초과되었습니다.")), Math.max(0, deadline - Date.now()));
+  const cancelOnNavigation = () => taskAbort.abort(new Error("페이지가 이동하여 자막 작업을 취소했습니다."));
+  window.addEventListener("pagehide", cancelOnNavigation, { once: true });
+  document.addEventListener("yt-navigate-start", cancelOnNavigation, { once: true });
+
+  function checkTask(): void {
+    if (!taskFinished && !restoringInteraction) {
+      if (Date.now() >= deadline && !taskAbort.signal.aborted) taskAbort.abort(new Error("자막 처리 시간이 초과되었습니다."));
+      taskAbort.signal.throwIfAborted();
+    }
+  }
+
+  function abortable<T>(operation: Promise<T>, signal: AbortSignal = taskAbort.signal): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const aborted = () => { signal.removeEventListener("abort", aborted); reject(signal.reason ?? new Error("자막 작업을 취소했습니다.")); };
+      // Always observe the underlying promise, including an already-aborted call.
+      operation.then(value => { signal.removeEventListener("abort", aborted); resolve(value); },
+        error => { signal.removeEventListener("abort", aborted); reject(error); });
+      if (signal.aborted) aborted();
+      else signal.addEventListener("abort", aborted, { once: true });
+    });
+  }
+
+  async function readCaptionResponse(response: Response, signal: AbortSignal): Promise<string> {
+    const declaredLength = Number(response.headers.get("content-length"));
+    if (declaredLength > MAX_CAPTION_BODY_BYTES) {
+      void response.body?.cancel().catch(() => {});
+      throw captionTextParserError("자막 응답이 허용 크기 8 MiB를 초과했습니다.");
+    }
+    if (!response.body?.getReader) {
+      const text = await abortable(response.text(), signal);
+      if (new TextEncoder().encode(text).byteLength > MAX_CAPTION_BODY_BYTES) throw captionTextParserError("자막 응답이 허용 크기를 초과했습니다.");
+      return text;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let bytes = 0, text = "", complete = false;
+    try {
+      for (;;) {
+        signal.throwIfAborted();
+        const chunk = await abortable(reader.read(), signal);
+        if (chunk.done) { complete = true; return text + decoder.decode(); }
+        bytes += chunk.value.byteLength;
+        if (bytes > MAX_CAPTION_BODY_BYTES) throw captionTextParserError("자막 응답이 허용 크기 8 MiB를 초과했습니다.");
+        text += decoder.decode(chunk.value, { stream: true });
+      }
+    } finally {
+      if (!complete) void reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  }
+
+  function textFromRuns(input: unknown) {
+    const value = record(input);
+    if (!value) return "";
+    if (typeof value.simpleText === "string") return value.simpleText.trim();
+    if (Array.isArray(value.runs)) {
+      return value.runs.map((run) => String(record(run).text || "")).join("").trim();
+    }
+    if (typeof value.content === "string") return value.content.trim();
+    return "";
+  }
+
+  function normalizeVisibleText(value: unknown) {
+    return String(value || "")
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+      .replace(/\u00A0/g, " ")
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function normalizeLanguageCode(value: unknown) {
+    const code = String(value || "").trim();
+    return /^[A-Za-z0-9]{2,8}(?:-[A-Za-z0-9]{1,8}){0,3}$/.test(code) ? code : "";
+  }
+
+  function parseMaybeJson(value: unknown): PlayerResponse | null {
+    if (!value) return null;
+    if (typeof value === "object") return value as PlayerResponse;
+    if (typeof value !== "string") return null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  function sleep(milliseconds: number|undefined) {
+    checkTask();
+    if (restoringInteraction || taskFinished) return new Promise<void>(resolve => setTimeout(resolve, milliseconds));
+    return new Promise<void>((resolve, reject) => {
+      const aborted = () => { clearTimeout(timer); taskAbort.signal.removeEventListener("abort", aborted); reject(taskAbort.signal.reason); };
+      const timer = setTimeout(() => { taskAbort.signal.removeEventListener("abort", aborted); resolve(); }, milliseconds);
+      taskAbort.signal.addEventListener("abort", aborted, { once: true });
+    });
+  }
+
+  function notifySyncedCaptionOverlayChanged() {
+    try {
+      document.dispatchEvent(new Event(SYNCED_CAPTION_CHANGED_EVENT));
+    } catch {
+      // The isolated overlay content script also scans videos on ordinary page changes.
+    }
+  }
+
+  function getUrlVideoId() {
+    try {
+      const url = new URL(location.href);
+      const host = url.hostname.toLowerCase();
+      if (!(host === "youtube.com" || host.endsWith(".youtube.com"))) return "";
+
+      if (url.pathname === "/watch") {
+        return String(url.searchParams.get("v") || "").trim();
+      }
+
+      const match = url.pathname.match(/^\/(?:shorts|live|embed)\/([^/?#]+)/i);
+      return match ? decodeURIComponent(match[1]).trim() : "";
+    } catch {
+      return "";
+    }
+  }
+
+  function isYoutubePage() {
+    try {
+      const host = new URL(location.href).hostname.toLowerCase();
+      return host === "youtube.com" || host.endsWith(".youtube.com");
+    } catch {
+      return false;
+    }
+  }
+
+  function getElementArea(element: Element) {
+    if (!(element instanceof Element)) return 0;
+    const rect = element.getBoundingClientRect();
+    const visibleWidth = Math.max(0, Math.min(innerWidth, rect.right) - Math.max(0, rect.left));
+    const visibleHeight = Math.max(0, Math.min(innerHeight, rect.bottom) - Math.max(0, rect.top));
+    return visibleWidth * visibleHeight;
+  }
+
+  function scoreVideo(video: HTMLVideoElement) {
+    if (!(video instanceof HTMLVideoElement)) return -1;
+    let score = getElementArea(video);
+    if (!video.paused && !video.ended) score += 1_000_000_000;
+    if (video.closest("ytd-reel-video-renderer[is-active], ytd-reel-video-renderer[active]")) {
+      score += 700_000_000;
+    }
+    if (video.readyState >= 2) score += 10_000_000;
+    return score;
+  }
+
+  function safePlayerResponse(player: YouTubePlayer | null) {
+    if (!player) return null;
+    try {
+      if (typeof player.getPlayerResponse === "function") {
+        const response = parseMaybeJson(player.getPlayerResponse());
+        if (response) return response;
+      }
+    } catch {
+      // Continue with other sources.
+    }
+    return null;
+  }
+
+  function safeVideoData(player: YouTubePlayer | null) {
+    if (!player || typeof player.getVideoData !== "function") return null;
+    try {
+      const data = player.getVideoData();
+      return data && typeof data === "object" ? data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function safePlayerOption(player: YouTubePlayer | null, moduleName: string, optionName: "track"): RawTrack | null;
+  function safePlayerOption(player: YouTubePlayer | null, moduleName: string, optionName: "tracklist"): RawTrack[] | null;
+  function safePlayerOption(player: YouTubePlayer | null, moduleName: string, optionName: string): unknown;
+  function safePlayerOption(player: YouTubePlayer | null, moduleName: string, optionName: string): unknown {
+    if (!player || typeof player.getOption !== "function") return null;
+    try {
+      return player.getOption(moduleName, optionName);
+    } catch {
+      return null;
+    }
+  }
+
+  function getResponseVideoId(response: PlayerResponse | null) {
+    return String(
+      response?.videoDetails?.videoId ||
+      response?.currentVideoEndpoint?.watchEndpoint?.videoId ||
+      ""
+    ).trim();
+  }
+
+  function hasCaptionRenderer(response: PlayerResponse | null) {
+    return Boolean(response?.captions?.playerCaptionsTracklistRenderer);
+  }
+
+  function collectPlayerResponses() {
+    const candidates: Candidate[] = [];
+    const seenPlayers = new Set();
+    const videos = Array.from(document.querySelectorAll("video"))
+      .sort((first, second) => scoreVideo(second) - scoreVideo(first));
+
+    function addPlayer(player: YouTubePlayer | null, score: number, source: string, video: HTMLVideoElement | null = null) {
+      if (!player || seenPlayers.has(player)) return;
+      seenPlayers.add(player);
+      const response = safePlayerResponse(player);
+      if (!response) return;
+      const data = safeVideoData(player);
+      candidates.push({
+        response,
+        videoId: getResponseVideoId(response) || String(data?.video_id || data?.videoId || "").trim(),
+        score: Number(score) || 0,
+        source,
+        player,
+        video: video || player.querySelector?.("video") || null
+      });
+    }
+
+    for (const video of videos) {
+      addPlayer(video.closest<YouTubePlayer>(".html5-video-player"), scoreVideo(video), "visible-player", video);
+    }
+
+    for (const player of document.querySelectorAll<YouTubePlayer>(".html5-video-player")) {
+      addPlayer(player, getElementArea(player), "player", player.querySelector?.("video") || null);
+    }
+
+    function safeYtcfgGet(key: string) {
+      try {
+        return typeof pageScope.ytcfg?.get === "function" ? pageScope.ytcfg.get(key) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    const globals = [
+      pageScope.ytInitialPlayerResponse,
+      pageScope.ytplayer?.config?.args?.player_response,
+      safeYtcfgGet("PLAYER_RESPONSE"),
+      record(record(safeYtcfgGet("PLAYER_CONFIG")).args).player_response
+    ];
+
+    for (const value of globals) {
+      const response = parseMaybeJson(value);
+      if (!response) continue;
+      candidates.push({
+        response,
+        videoId: getResponseVideoId(response),
+        score: -1,
+        source: "page-data",
+        player: null,
+        video: null
+      });
+    }
+
+    return candidates;
+  }
+
+  function choosePlayerResponse() {
+    const urlVideoId = getUrlVideoId();
+    const candidates = collectPlayerResponses()
+      .filter((candidate) => candidate.response && typeof candidate.response === "object")
+      .sort((first, second) => second.score - first.score);
+
+    if (urlVideoId) {
+      const exact = candidates.find((candidate) => candidate.videoId === urlVideoId && hasCaptionRenderer(candidate.response));
+      if (exact) return exact;
+
+      const exactWithoutCaptions = candidates.find((candidate) => candidate.videoId === urlVideoId);
+      if (exactWithoutCaptions) return exactWithoutCaptions;
+    }
+
+    const visibleWithCaptions = candidates.find((candidate) => hasCaptionRenderer(candidate.response));
+    if (visibleWithCaptions) return visibleWithCaptions;
+
+    return candidates[0] || null;
+  }
+
+  function isAutoGeneratedTrack(track: RawTrack) {
+    const kind = String(track?.kind || "").toLowerCase();
+    const vssId = String(track?.vssId || "").toLowerCase();
+    return kind === "asr" || vssId.startsWith("a.") || vssId.includes(".asr");
+  }
+
+  function makeTrackLabel(track: RawTrack, index: number) {
+    const languageCode = normalizeLanguageCode(track?.languageCode) || "und";
+    const name = textFromRuns(track?.name) || languageCode || `자막 ${index + 1}`;
+    const automatic = isAutoGeneratedTrack(track);
+    const alreadyMentionsAutomatic = /auto|automatic|자동|自動|自动|automatisch|automatique|automático|автомат/i.test(name);
+    return automatic && !alreadyMentionsAutomatic ? `${name} · 자동 생성` : name;
+  }
+
+  function buildCaptionInfo(candidate: Candidate) {
+    const response = candidate?.response || {};
+    const renderer = response?.captions?.playerCaptionsTracklistRenderer;
+    const rawTracks = Array.isArray(renderer?.captionTracks) ? renderer.captionTracks : [];
+    const rawLanguages = Array.isArray(renderer?.translationLanguages) ? renderer.translationLanguages : [];
+    const videoId = getResponseVideoId(response) || candidate?.videoId || getUrlVideoId();
+    const title = normalizeVisibleText(response?.videoDetails?.title) ||
+      normalizeVisibleText(document.title.replace(/\s*-\s*YouTube\s*$/i, "")) ||
+      "YouTube 영상";
+
+    const tracks = rawTracks.map((track, index) => ({
+      index,
+      id: String(track?.vssId || `${track?.languageCode || "und"}:${index}`),
+      languageCode: normalizeLanguageCode(track?.languageCode) || "und",
+      name: textFromRuns(track?.name) || normalizeLanguageCode(track?.languageCode) || `자막 ${index + 1}`,
+      label: makeTrackLabel(track, index),
+      isAutoGenerated: isAutoGeneratedTrack(track),
+      isTranslatable: track?.isTranslatable !== false,
+      isDefault: track?.isDefault === true,
+      kind: String(track?.kind || "")
+    }));
+
+    const translationLanguages = [];
+    const seenLanguages = new Set();
+    for (const language of rawLanguages) {
+      const languageCode = normalizeLanguageCode(language?.languageCode);
+      if (!languageCode || seenLanguages.has(languageCode)) continue;
+      seenLanguages.add(languageCode);
+      translationLanguages.push({
+        languageCode,
+        name: textFromRuns(language?.languageName) || languageCode
+      });
+    }
+
+    return {
+      response,
+      renderer,
+      rawTracks,
+      videoId,
+      title,
+      tracks,
+      translationLanguages,
+      pageUrl: location.href
+    };
+  }
+
+  function normalizeCaptionEntry(value: unknown) {
+    const entry = record(value);
+    const startMs = Math.max(0, Math.round(Number(entry?.startMs) || 0));
+    const durationMs = Math.max(0, Math.round(Number(entry?.durationMs) || 0));
+    const text = normalizeVisibleText(entry?.text);
+    return text ? { startMs, durationMs, text } : null;
+  }
+
+  function finalizeEntries(rawEntries: readonly unknown[]) {
+    const entries = [];
+    for (const rawEntry of rawEntries || []) {
+      const entry = normalizeCaptionEntry(rawEntry);
+      if (!entry) continue;
+
+      const previous = entries[entries.length - 1];
+      if (
+        previous &&
+        previous.text === entry.text &&
+        Math.abs(previous.startMs - entry.startMs) <= 250
+      ) {
+        previous.durationMs = Math.max(previous.durationMs, entry.durationMs);
+        continue;
+      }
+
+      entries.push(entry);
+    }
+    return entries;
+  }
+
+  function captionTextParserError(message: string) {
+    const error = new Error(String(message || "자막 텍스트를 처리하지 못했습니다."));
+    (error as Error & { code: string }).code = "CAPTION_TEXT_PARSER_ERROR";
+    return error;
+  }
+
+  async function requestCaptionTextParsing(operation: string, data: Record<string, unknown>) {
+    checkTask();
+    const channelId = task.captionTextChannelId;
+    if (typeof channelId !== "string" || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(channelId)) {
+      throw captionTextParserError("자막 텍스트 처리기가 준비되지 않았습니다. 확장 프로그램을 다시 불러온 뒤 다시 시도하세요.");
+    }
+    const requestId = `${channelId}:${++captionTextRequestSequence}`;
+    const requestEvent = `browser-toolbox-caption-text-request:${channelId}`;
+    const responseEvent = `browser-toolbox-caption-text-response:${channelId}`;
+    return await new Promise<Record<string, unknown>>((resolve, reject) => {
+      let timer: number|undefined;
+      const cleanup = () => {
+        clearTimeout(timer);
+        document.removeEventListener(responseEvent, onResponse, true);
+        window.removeEventListener("pagehide", onPageHide, true);
+        taskAbort.signal.removeEventListener("abort", onAbort);
+      };
+      const onAbort = () => { cleanup(); reject(taskAbort.signal.reason); };
+      const onPageHide = () => {
+        cleanup();
+        reject(captionTextParserError("문서가 닫히거나 이동하여 자막 텍스트 처리를 중단했습니다."));
+      };
+      const onResponse = (event: Event) => {
+        if (!(event instanceof CustomEvent)) return;
+        if (typeof event.detail !== "string" || event.detail.length > 50_000_000) return;
+        let response;
+        try { response = JSON.parse(event.detail); } catch { return; }
+        if (response?.requestId !== requestId) return;
+        cleanup();
+        if (taskAbort.signal.aborted) { reject(taskAbort.signal.reason); return; }
+        if (response.ok !== true) {
+          reject(captionTextParserError(response.error));
+          return;
+        }
+        resolve(response);
+      };
+      document.addEventListener(responseEvent, onResponse, true);
+      window.addEventListener("pagehide", onPageHide, true);
+      taskAbort.signal.addEventListener("abort", onAbort, { once: true });
+      timer = setTimeout(() => {
+        cleanup();
+        reject(captionTextParserError("자막 텍스트 처리기의 응답을 받지 못했습니다. 페이지를 새로 고친 뒤 다시 시도하세요."));
+      }, CAPTION_REQUEST_TIMEOUT_MS);
+      try {
+        document.dispatchEvent(new CustomEvent(requestEvent, {
+          detail: JSON.stringify({ ...data, operation, requestId })
+        }));
+      } catch (error) {
+        cleanup();
+        reject(captionTextParserError(error instanceof Error ? error.message : "자막 요청을 전달하지 못했습니다."));
+      }
+    });
+  }
+
+  async function decodeCaptionTexts(texts: string[]) {
+    const response = await requestCaptionTextParsing("decode-texts", { texts });
+    if (!Array.isArray(response.texts) || response.texts.length !== texts.length ||
+        response.texts.some((text) => typeof text !== "string")) {
+      throw captionTextParserError("자막 텍스트 처리기의 응답 형식이 올바르지 않습니다.");
+    }
+    return response.texts;
+  }
+
+  async function parseJson3(value: unknown) {
+    const payload = record(value) as { events?: Array<{ segs?: Array<{ utf8?: string }>; tStartMs?: number; dDurationMs?: number }> };
+    const events = (Array.isArray(payload?.events) ? payload.events : [])
+      .filter((event) => Array.isArray(event?.segs));
+    if (events.length === 0) return [];
+    const texts = await decodeCaptionTexts(events.map((event) => (
+      (event.segs || []).map((segment) => String(segment?.utf8 || "")).join("")
+    )));
+    return finalizeEntries(events.map((event, index) => ({
+      startMs: Number(event?.tStartMs) || 0,
+      durationMs: Number(event?.dDurationMs) || 0,
+      text: texts[index]
+    })));
+  }
+
+  async function parseXml(text: string) {
+    const response = await requestCaptionTextParsing("parse-xml", { text });
+    if (!Array.isArray(response.entries) || response.entries.length > 50_000 ||
+        response.entries.some((entry) => !entry || typeof entry.text !== "string" ||
+          !Number.isFinite(entry.startMs) || !Number.isFinite(entry.durationMs))) {
+      throw captionTextParserError("자막 XML 처리기의 응답 형식이 올바르지 않습니다.");
+    }
+    return finalizeEntries(response.entries);
+  }
+
+  function parseVttTime(value: string) {
+    const parts = String(value || "").trim().split(":").map(Number);
+    if (parts.some((part) => !Number.isFinite(part))) return 0;
+    if (parts.length === 3) return Math.round(((parts[0] * 3600) + (parts[1] * 60) + parts[2]) * 1000);
+    if (parts.length === 2) return Math.round(((parts[0] * 60) + parts[1]) * 1000);
+    return 0;
+  }
+
+  async function parseVtt(text: string) {
+    const lines = String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/);
+    const entries = [];
+    let index = 0;
+
+    while (index < lines.length) {
+      const line = lines[index].trim();
+      if (!line || line === "WEBVTT" || /^(?:NOTE|STYLE|REGION)(?:\s|$)/.test(line)) {
+        index += 1;
+        continue;
+      }
+
+      let timingLine = line;
+      if (!timingLine.includes("-->")) {
+        index += 1;
+        timingLine = String(lines[index] || "").trim();
+      }
+      if (!timingLine.includes("-->")) {
+        index += 1;
+        continue;
+      }
+
+      const timingMatch = timingLine.match(/^([^\s]+)\s+-->\s+([^\s]+)/);
+      index += 1;
+      const cueLines = [];
+      while (index < lines.length && lines[index].trim() !== "") {
+        cueLines.push(lines[index]);
+        index += 1;
+      }
+
+      if (!timingMatch) continue;
+      const startMs = parseVttTime(timingMatch[1]);
+      const endMs = parseVttTime(timingMatch[2]);
+      const cueText = cueLines.join(" ")
+        .replace(/<\/?(?:c|v|lang)(?:\.[^ >]+|\s+[^>]*)?>/gi, "")
+        .replace(/<\d{2}:\d{2}(?::\d{2})?\.\d{3}>/g, "");
+      entries.push({ startMs, durationMs: Math.max(0, endMs - startMs), text: cueText });
+    }
+
+    if (entries.length === 0) return [];
+    const texts = await decodeCaptionTexts(entries.map((entry) => entry.text));
+    return finalizeEntries(entries.map((entry, index) => ({ ...entry, text: texts[index] })));
+  }
+
+  function readRichText(input: unknown) {
+    if (!input) return "";
+    if (typeof input === "string") return input;
+    const value = record(input);
+    if (typeof value.simpleText === "string") return value.simpleText;
+    if (typeof value.content === "string") return value.content;
+    if (Array.isArray(value.runs)) return value.runs.map((run) => String(run?.text || "")).join("");
+    if (record(value.elementsAttributedString).content) return String(record(value.elementsAttributedString).content);
+    return "";
+  }
+
+  function parseTimestampLabelToMs(value: unknown) {
+    const label = normalizeVisibleText(readRichText(value) || value);
+    if (!label) return null;
+    const parts = label.split(":").map((part) => Number(part));
+    if (parts.length < 2 || parts.length > 3 || parts.some((part) => !Number.isFinite(part))) return null;
+    let seconds = 0;
+    for (const part of parts) seconds = (seconds * 60) + part;
+    return Math.max(0, Math.round(seconds * 1000));
+  }
+
+  function finiteCaptionNumber(value: unknown) {
+    if (value === null || value === undefined || typeof value === "boolean" || (typeof value === "string" && !value.trim())) return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function parseTranscriptRendererNode(value: unknown, inheritedStartMs: number | null = null) {
+    const rawNode = record(value);
+    const node = record(rawNode.transcriptSegmentRenderer || rawNode.transcriptCueRenderer || rawNode);
+    if (!node || node.transcriptSectionHeaderRenderer) return null;
+    const startMs = finiteCaptionNumber(node.startMs) ?? finiteCaptionNumber(node.startTimeMs) ??
+      parseTimestampLabelToMs(node.startTimeText) ?? parseTimestampLabelToMs(node.startOffsetText) ?? finiteCaptionNumber(inheritedStartMs);
+    if (startMs === null || startMs < 0) return null;
+    const endMs = finiteCaptionNumber(node.endMs);
+    const durationMs = finiteCaptionNumber(node.durationMs) ?? (endMs !== null ? Math.max(0, endMs - startMs) : 0);
+    const text = normalizeVisibleText(readRichText(node.snippet) || readRichText(node.cue) || readRichText(node.text) || readRichText(node));
+    return text ? { startMs, durationMs, text } : null;
+  }
+
+  function parseActualTranscriptResponse(payload: object) {
+    const rawEntries: { startMs: number; durationMs: number; text: string; }[] = [];
+    const seen = new WeakSet();
+    function visit(value: unknown, depth = 0, inheritedStartMs: number | null = null, directCue = false) {
+      if (!value || typeof value !== "object") return;
+      if (Array.isArray(value)) { for (const item of value) visit(item, depth + 1, inheritedStartMs, directCue); return; }
+      const node = record(value);
+      if (!node || typeof node !== "object" || depth > 24 || seen.has(node)) return;
+      seen.add(node);
+      if (Array.isArray(node)) { for (const item of node) visit(item, depth + 1, inheritedStartMs, directCue); return; }
+      if (node.transcriptCueGroupRenderer) {
+        const group = record(node.transcriptCueGroupRenderer);
+        const start = finiteCaptionNumber(group.startMs) ?? parseTimestampLabelToMs(group.formattedStartOffset) ?? inheritedStartMs;
+        seen.add(group);
+        visit(group.cues, depth + 1, start, true);
+      }
+      if (directCue && !node.transcriptCueGroupRenderer && !node.transcriptSegmentRenderer && !node.transcriptCueRenderer) {
+        const parsed = parseTranscriptRendererNode(node, inheritedStartMs);
+        if (parsed) rawEntries.push(parsed);
+        return;
+      }
+      for (const key of ["transcriptSegmentRenderer", "transcriptCueRenderer"]) {
+        if (!node[key] || typeof node[key] !== "object" || seen.has(node[key])) continue;
+        seen.add(node[key]);
+        const parsed = parseTranscriptRendererNode(node[key], inheritedStartMs);
+        if (parsed) rawEntries.push(parsed);
+      }
+      for (const [key, value] of Object.entries(node)) {
+        if (["transcriptSegmentRenderer", "transcriptCueRenderer", "transcriptCueGroupRenderer"].includes(key)) continue;
+        if (value && typeof value === "object") visit(value, depth + 1, inheritedStartMs);
+      }
+    }
+    visit(payload);
+    const entries = finalizeEntries(rawEntries).sort((first, second) => first.startMs - second.startMs);
+    for (let index = 0; index < entries.length; index += 1) {
+      if (entries[index].durationMs > 0) continue;
+      const next = entries[index + 1];
+      if (next && next.startMs > entries[index].startMs) {
+        entries[index].durationMs = next.startMs - entries[index].startMs;
+      }
+    }
+    return entries;
+  }
+
+  async function parseCaptionPayload(text: string, sourceUrl = "", contentType = "") {
+    const normalized = String(text || "").trim().replace(/^\)\]\}'\s*\n?/, "");
+    if (!normalized) return [];
+
+    if (normalized.startsWith("WEBVTT") || /(?:^|\n)\d{1,2}:\d{2}(?::\d{2})?[.,]\d{3}\s+-->/.test(normalized)) {
+      const entries = await parseVtt(normalized.replace(/,(\d{3})(?=\s+-->)/g, ".$1"));
+      if (entries.length > 0) return entries;
+    }
+
+    let payload = null;
+    try { payload = JSON.parse(normalized); } catch { /* Not JSON: inspect the XML format below. */ }
+    if (payload && typeof payload === "object") {
+      // Only JSON syntax errors mean "try another format". Parser/bridge failures must
+      // not be swallowed and misreported as missing captions or a network problem.
+      const json3Entries = await parseJson3(payload);
+      if (json3Entries.length > 0) return json3Entries;
+      const transcriptEntries = parseActualTranscriptResponse(payload);
+      if (transcriptEntries.length > 0) return transcriptEntries;
+    }
+
+    if (/xml|html/i.test(contentType) || normalized.startsWith("<")) {
+      const entries = await parseXml(normalized);
+      if (entries.length > 0) return entries;
+    }
+
+    void sourceUrl;
+    return [];
+  }
+
+  function isTimedTextUrl(rawUrl: string) {
+    return /\/api\/timedtext(?:[?#]|$)|\/timedtext(?:[?#]|$)/i.test(String(rawUrl || ""));
+  }
+
+  function isTranscriptApiUrl(rawUrl: string) {
+    return /\/youtubei\/v1\/get_transcript(?:[?#]|$)/i.test(String(rawUrl || ""));
+  }
+
+  function getUrlParameter(rawUrl: string, name: string) {
+    try {
+      return new URL(String(rawUrl || ""), location.href).searchParams.get(name) || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function verifiedCaptionUrl(rawUrl: string, videoId: string, rawTrack: RawTrack, translationLanguageCode: string) {
+    if (!isTimedTextUrl(rawUrl) || !videoId || !rawTrack?.languageCode) return false;
+    try {
+      const url = new URL(rawUrl, location.href);
+      const base = rawTrack.baseUrl ? new URL(rawTrack.baseUrl, location.href) : null;
+      if (url.protocol !== "https:" || (base ? url.origin !== base.origin : !/(^|\.)youtube\.com$/i.test(url.hostname))) return false;
+      if (url.searchParams.get("v") !== videoId) return false;
+      if (normalizeLanguageCode(url.searchParams.get("lang")).toLowerCase() !== normalizeLanguageCode(rawTrack.languageCode).toLowerCase()) return false;
+      if (normalizeLanguageCode(url.searchParams.get("tlang")).toLowerCase() !== normalizeLanguageCode(translationLanguageCode).toLowerCase()) return false;
+      const expectedKind = String(rawTrack.kind || base?.searchParams.get("kind") || "").toLowerCase();
+      if (String(url.searchParams.get("kind") || "").toLowerCase() !== expectedKind) return false;
+      if (base && (url.searchParams.get("name") || "") !== (base.searchParams.get("name") || "")) return false;
+      return true;
+    } catch { return false; }
+  }
+
+  function captionUrlScore(rawUrl: unknown, videoId: string, rawTrack: RawTrack, translationLanguageCode: string|null) {
+    const url = String(rawUrl || "");
+    if (!isTimedTextUrl(url) && !isTranscriptApiUrl(url)) return -Infinity;
+    let score = isTimedTextUrl(url) ? 20 : 5;
+
+    const requestVideoId = getUrlParameter(url, "v");
+    if (requestVideoId) score += requestVideoId === videoId ? 30 : -80;
+
+    const trackLanguage = normalizeLanguageCode(rawTrack?.languageCode).toLowerCase();
+    const requestLanguage = normalizeLanguageCode(getUrlParameter(url, "lang")).toLowerCase();
+    if (requestLanguage) score += requestLanguage === trackLanguage ? 20 : -15;
+
+    const requestedTranslation = normalizeLanguageCode(translationLanguageCode).toLowerCase();
+    const requestTranslation = normalizeLanguageCode(getUrlParameter(url, "tlang")).toLowerCase();
+    if (requestedTranslation) {
+      score += requestTranslation === requestedTranslation ? 30 : (requestTranslation ? -30 : -5);
+    } else if (requestTranslation) {
+      score -= 25;
+    }
+
+    const requestKind = String(getUrlParameter(url, "kind") || "").toLowerCase();
+    if (requestKind) {
+      score += isAutoGeneratedTrack(rawTrack) === (requestKind === "asr") ? 8 : -8;
+    }
+
+    if (getUrlParameter(url, "pot")) score += 15;
+    if (getUrlParameter(url, "fmt") === "json3") score += 5;
+    return score;
+  }
+
+  function requiresPlayerIssuedToken(rawUrl: string) {
+    try {
+      const url = new URL(String(rawUrl || ""), location.href);
+      return url.searchParams.get("exp") === "xpe" && !url.searchParams.has("pot");
+    } catch {
+      return /(?:[?&])exp=xpe(?:&|$)/i.test(String(rawUrl || "")) && !/(?:[?&])pot=/.test(String(rawUrl || ""));
+    }
+  }
+
+  function buildCaptionRequestUrls(baseUrl: string|URL, translationLanguageCode: string|null, exactOnly = false) {
+    const normalizedTranslationCode = normalizeLanguageCode(translationLanguageCode);
+    const output: string[] = [];
+    const seen = new Set();
+
+    function add(url: string) {
+      const value = String(url || "").trim();
+      if (!value || seen.has(value)) return;
+      seen.add(value);
+      output.push(value);
+    }
+
+    try {
+      const original = new URL(baseUrl, location.href);
+      if (exactOnly) {
+        // A player-issued request can contain signatures and playback proof.
+        // Use it byte-for-byte instead of rebuilding query parameters.
+        add(original.toString());
+        return output;
+      }
+
+      if (normalizedTranslationCode) original.searchParams.set("tlang", normalizedTranslationCode);
+      else original.searchParams.delete("tlang");
+      add(original.toString());
+      for (const format of ["json3", "srv3", "vtt"]) {
+        const next = new URL(original.toString());
+        next.searchParams.set("fmt", format);
+        add(next.toString());
+      }
+    } catch {
+      add(String(baseUrl));
+    }
+
+    return output;
+  }
+
+  async function fetchCaptionUrl(rawUrl: string, translationLanguageCode: string, exactOnly = false) {
+    let lastStatus = 0;
+    for (const url of buildCaptionRequestUrls(rawUrl, translationLanguageCode, exactOnly)) {
+      checkTask();
+      const requestAbort = new AbortController();
+      const cancel = () => requestAbort.abort(taskAbort.signal.reason);
+      taskAbort.signal.addEventListener("abort", cancel, { once: true });
+      const requestTimer = setTimeout(() => requestAbort.abort(new Error("자막 네트워크 요청 시간이 초과되었습니다.")), CAPTION_REQUEST_TIMEOUT_MS);
+      try {
+        const response = await abortable(fetch(url, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+          redirect: "follow",
+          referrer: location.href,
+          referrerPolicy: "strict-origin-when-cross-origin",
+          signal: requestAbort.signal
+        }), requestAbort.signal);
+        lastStatus = response.status;
+        if (!response.ok) continue;
+        const contentType = response.headers.get("content-type") || "";
+        const text = await readCaptionResponse(response, requestAbort.signal);
+        checkTask();
+        if (!text.trim()) continue;
+        const entries = await parseCaptionPayload(text, response.url || url, contentType);
+        if (entries.length > 0) {
+          const format = getUrlParameter(response.url || url, "fmt") ||
+            (contentType.includes("json") ? "json3" : contentType.includes("vtt") ? "vtt" : "captions");
+          return { entries, format: `timedtext-${format}`, url: response.url || url };
+        }
+      } catch (error) {
+        if (requestAbort.signal.aborted) throw requestAbort.signal.reason;
+        if (record(error).code === "CAPTION_TEXT_PARSER_ERROR") throw error;
+        // Try the next URL supplied by the player only for network/format availability.
+      } finally {
+        clearTimeout(requestTimer);
+        taskAbort.signal.removeEventListener("abort", cancel);
+      }
+    }
+    return { entries: [], status: lastStatus };
+  }
+
+  async function fetchCaptionEntries(baseUrl: string, translationLanguageCode: string) {
+    if (!baseUrl) return null;
+    const result = await fetchCaptionUrl(baseUrl, translationLanguageCode, false);
+    return result.entries.length > 0 ? result : null;
+  }
+
+  function collectUrlsFromObject(value: unknown, output: Set<string>, seen = new WeakSet(), depth = 0) {
+    if (value == null || depth > 12 || output.size >= 128) return;
+    if (typeof value === "string") {
+      if (isTimedTextUrl(value) || isTranscriptApiUrl(value)) output.add(value);
+      return;
+    }
+    if (typeof value !== "object") return;
+    if (seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) collectUrlsFromObject(item, output, seen, depth + 1);
+      return;
+    }
+    for (const item of Object.values(value)) collectUrlsFromObject(item, output, seen, depth + 1);
+  }
+
+  function createActualYouTubeRequestCapture(info: CaptionInfo, rawTrack: RawTrack, translationLanguageCode: string) {
+    const records: { url: string; text: string; contentType: string; }[] = [];
+    const urlSet = new Set<string>();
+    let captureActive = true;
+    let capturedBytes = 0;
+    const captureAbort = new AbortController();
+    const cancelCapture = () => captureAbort.abort(taskAbort.signal.reason);
+    taskAbort.signal.addEventListener("abort", cancelCapture, { once: true });
+    const addUrl = (url: string) => {
+      const value = String(url || "");
+      if (captureActive && urlSet.size < 128 && (isTimedTextUrl(value) || isTranscriptApiUrl(value))) urlSet.add(value);
+    };
+    const addBody = (url: string, text: string, contentType = "") => {
+      const value = String(text || "");
+      addUrl(url);
+      if (!captureActive || taskAbort.signal.aborted || !value.trim() || records.length >= 16) return;
+      const bytes = new TextEncoder().encode(value).byteLength;
+      if (capturedBytes + bytes > MAX_CAPTION_BODY_BYTES) return;
+      capturedBytes += bytes;
+      records.push({ url: String(url || ""), text: value, contentType: String(contentType || "") });
+    };
+
+    try {
+      for (const entry of performance.getEntriesByType("resource")) addUrl(entry?.name);
+    } catch {
+      // Resource timing is optional.
+    }
+
+    let observer = null;
+    try {
+      observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) addUrl(entry?.name);
+      });
+      observer.observe({ type: "resource", buffered: true });
+    } catch {
+      observer = null;
+    }
+
+    const originalFetch = globalThis.fetch;
+    let wrappedFetch = null;
+    if (typeof originalFetch === "function") {
+      wrappedFetch = async function (this: typeof globalThis, ...args: Parameters<typeof fetch>) {
+        const response = await originalFetch.apply(this, args);
+        try {
+          const requestedUrl = typeof args[0] === "string" ? args[0] : args[0] instanceof URL ? args[0].href : args[0].url;
+          const responseUrl = String(response?.url || requestedUrl);
+          if (isTimedTextUrl(responseUrl) || isTranscriptApiUrl(responseUrl)) {
+            addUrl(responseUrl);
+            readCaptionResponse(response.clone(), captureAbort.signal).then((text) => {
+              addBody(responseUrl, text, response.headers?.get?.("content-type") || "");
+            }).catch(() => {});
+          }
+        } catch {
+          // Monitoring must never interfere with the page request.
+        }
+        return response;
+      };
+      globalThis.fetch = wrappedFetch;
+    }
+
+    const xhrPrototype = globalThis.XMLHttpRequest?.prototype;
+    const originalOpen = xhrPrototype?.open;
+    const originalSend = xhrPrototype?.send;
+    const xhrUrls = new WeakMap();
+    let wrappedOpen = null;
+    let wrappedSend = null;
+    if (xhrPrototype && originalOpen && originalSend) {
+      wrappedOpen = function (this: XMLHttpRequest, method: string, url: string | URL, ...rest: [async?: boolean, username?: string | null, password?: string | null]) {
+        const requestUrl = String(url || "");
+        xhrUrls.set(this, requestUrl);
+        addUrl(requestUrl);
+        return Reflect.apply(originalOpen, this, [method, url, ...rest]);
+      };
+      wrappedSend = function (this: XMLHttpRequest, ...args: [body?: Document|XMLHttpRequestBodyInit|null|undefined]) {
+        const requestUrl = String(xhrUrls.get(this) || "");
+        if (!isTimedTextUrl(requestUrl) && !isTranscriptApiUrl(requestUrl)) {
+          return originalSend.apply(this, args);
+        }
+
+        this.addEventListener("load", function (this: XMLHttpRequest) {
+          const url = String(xhrUrls.get(this) || this.responseURL || "");
+          try {
+            let body = "";
+            if (typeof this.responseText === "string") body = this.responseText;
+            else if (typeof this.response === "string") body = this.response;
+            else if (this.response && typeof this.response === "object") body = JSON.stringify(this.response);
+            addBody(this.responseURL || url, body, this.getResponseHeader?.("content-type") || "");
+          } catch {
+            // Some responseType values do not expose responseText.
+          }
+        }, { once: true });
+        return originalSend.apply(this, args);
+      };
+      xhrPrototype.open = wrappedOpen;
+      xhrPrototype.send = wrappedSend;
+    }
+
+    return {
+      addUrlsFrom(value: unknown) {
+        collectUrlsFromObject(value, urlSet);
+      },
+      async getParsedResult() {
+        checkTask();
+        const ordered = records
+          .filter(record => verifiedCaptionUrl(record.url, info.videoId, rawTrack, translationLanguageCode))
+          .map((record) => ({
+            ...record,
+            score: captionUrlScore(record.url, info.videoId, rawTrack, translationLanguageCode)
+          }))
+          .sort((first, second) => second.score - first.score);
+        for (const record of ordered) {
+          const entries = await parseCaptionPayload(record.text, record.url, record.contentType);
+          if (entries.length > 0) {
+            return {
+              entries,
+              format: isTranscriptApiUrl(record.url) ? "youtube-player-transcript-response" : "youtube-player-timedtext-response",
+              url: record.url
+            };
+          }
+        }
+        return null;
+      },
+      getUrls() {
+        return [...urlSet]
+          .filter(url => verifiedCaptionUrl(url, info.videoId, rawTrack, translationLanguageCode))
+          .map((url) => ({ url, score: captionUrlScore(url, info.videoId, rawTrack, translationLanguageCode) }))
+          .filter((item) => Number.isFinite(item.score) && item.score > -50)
+          .sort((first, second) => second.score - first.score)
+          .map((item) => item.url);
+      },
+      cleanup() {
+        captureActive = false;
+        captureAbort.abort();
+        taskAbort.signal.removeEventListener("abort", cancelCapture);
+        records.length = 0;
+        urlSet.clear();
+        try { observer?.disconnect(); } catch { /* Ignore. */ }
+        if (wrappedFetch && globalThis.fetch === wrappedFetch) globalThis.fetch = originalFetch;
+        if (xhrPrototype?.open === wrappedOpen) xhrPrototype.open = originalOpen;
+        if (xhrPrototype?.send === wrappedSend) xhrPrototype.send = originalSend;
+      }
+    };
+  }
+
+  function findPlayerForVideoId(videoId: string) {
+    for (const player of document.querySelectorAll<YouTubePlayer>(".html5-video-player")) {
+      const data = safeVideoData(player);
+      const response = safePlayerResponse(player);
+      const id = String(data?.video_id || data?.videoId || getResponseVideoId(response) || "").trim();
+      if (!videoId || id === videoId) return player;
+    }
+    return null;
+  }
+
+  function findVideoForPlayer(player: YouTubePlayer | null, candidate: Candidate | null) {
+    const candidateVideo = candidate?.video;
+    if (candidateVideo instanceof HTMLVideoElement && candidateVideo.isConnected) return candidateVideo;
+
+    const playerVideo = player?.querySelector?.("video");
+    if (playerVideo instanceof HTMLVideoElement && playerVideo.isConnected) return playerVideo;
+
+    const visibleVideos = Array.from(document.querySelectorAll("video"))
+      .filter((video) => video instanceof HTMLVideoElement && video.isConnected)
+      .sort((first, second) => scoreVideo(second) - scoreVideo(first));
+    return visibleVideos[0] || null;
+  }
+
+  function getCaptionButton(player: YouTubePlayer | null) {
+    return player?.querySelector<HTMLElement>(".ytp-subtitles-button, .ytp-caption-button") || null;
+  }
+
+  function clonePlayerOptionValue(value: unknown) {
+    if (value == null || typeof value !== "object") return value;
+    try {
+      if (typeof structuredClone === "function") return structuredClone(value);
+    } catch {
+      // Some YouTube player objects contain non-cloneable values.
+    }
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch {
+      try { return Array.isArray(value) ? [...value] : { ...value }; } catch { return value; }
+    }
+  }
+
+  function readPlayerOptionSnapshot(player: YouTubePlayer | null, moduleName: string, optionName: string) {
+    if (!player || typeof player.getOption !== "function") {
+      return { available: false, value: null };
+    }
+    try {
+      return { available: true, value: clonePlayerOptionValue(player.getOption(moduleName, optionName)) };
+    } catch {
+      return { available: false, value: null };
+    }
+  }
+
+  function readCaptionsModuleLoaded(player: YouTubePlayer | null) {
+    if (!player || typeof player.isModuleLoaded !== "function") return null;
+    try {
+      return player.isModuleLoaded("captions") === true;
+    } catch {
+      return null;
+    }
+  }
+
+  function captureTextTrackModes(video: HTMLVideoElement | null) {
+    if (!(video instanceof HTMLMediaElement) || !video.textTracks) return [];
+    try {
+      return Array.from(video.textTracks).map((track) => ({ track, mode: track.mode }));
+    } catch {
+      return [];
+    }
+  }
+
+  function restoreTextTrackModes(writes: Map<TextTrack, { before: TextTrackMode; after: TextTrackMode }>) {
+    for (const [track, write] of writes) {
+      try {
+        if (track.mode === write.after) track.mode = write.before;
+      } catch {
+        // Some browser-managed tracks reject mode changes while the source is changing.
+      }
+    }
+  }
+
+  function sameCaptionOption(first: ReturnType<typeof readPlayerOptionSnapshot>, second: ReturnType<typeof readPlayerOptionSnapshot>): boolean {
+    if (first.available !== second.available) return false;
+    if (Object.is(first.value, second.value)) return true;
+    try {
+      const stable = (_key: string, value: unknown): unknown => value && typeof value === "object" && !Array.isArray(value)
+        ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))) : value;
+      return JSON.stringify(first.value, stable) === JSON.stringify(second.value, stable);
+    } catch { return false; }
+  }
+
+  function ownsCaptionChanges(state: InteractionState): boolean {
+    const edits = state.captionEdits;
+    const expectedTrack = edits.track?.after ?? state.previousTrack;
+    const expectedButton = edits.button?.after ?? state.captionButtonWasPressed;
+    if (!sameCaptionOption(readPlayerOptionSnapshot(state.player, "captions", "track"), expectedTrack) ||
+      (expectedButton !== null && readCaptionButtonPressed(getCaptionButton(state.player)) !== expectedButton) ||
+      captureTextTrackModes(state.video).some(({ track, mode }) => mode !== (edits.expectedModes.get(track) ?? "disabled"))) edits.userTookControl = true;
+    return !edits.userTookControl;
+  }
+
+  function mutateCaptions(state: InteractionState, action: () => void): boolean {
+    if (!ownsCaptionChanges(state)) return false;
+    const beforeTrack = readPlayerOptionSnapshot(state.player, "captions", "track");
+    const button = getCaptionButton(state.player);
+    const beforeButton = readCaptionButtonPressed(button);
+    const beforeModes = new Map(captureTextTrackModes(state.video).map(({ track, mode }) => [track, mode]));
+    try { action(); }
+    finally {
+      const edits = state.captionEdits;
+      const afterTrack = readPlayerOptionSnapshot(state.player, "captions", "track");
+      if (beforeTrack.available && afterTrack.available && !sameCaptionOption(beforeTrack, afterTrack)) {
+        edits.track = { before: edits.track?.before ?? beforeTrack, after: afterTrack };
+      }
+      const afterButton = readCaptionButtonPressed(button);
+      if (button && beforeButton !== null && afterButton !== null && beforeButton !== afterButton) {
+        edits.button = { element: button, before: edits.button?.before ?? beforeButton, after: afterButton };
+      }
+      const afterModes = captureTextTrackModes(state.video);
+      for (const { track, mode } of afterModes) {
+        const before = beforeModes.get(track) ?? "disabled";
+        if (before !== mode) edits.modes.set(track, { before: edits.modes.get(track)?.before ?? before, after: mode });
+      }
+      edits.expectedModes = new Map(afterModes.map(({ track, mode }) => [track, mode]));
+    }
+    return true;
+  }
+
+  function captureTranscriptScrollPositions() {
+    const snapshots = [];
+    const seen = new Set();
+    for (const root of findTranscriptPanelRoots()) {
+      if (!elementIsVisible(root)) continue;
+      const candidates = [root, ...deepQueryAll(root, (element: { scrollHeight: number; clientHeight: number; scrollWidth: number; clientWidth: number; }) => {
+        try {
+          return element.scrollHeight > element.clientHeight + 1 ||
+            element.scrollWidth > element.clientWidth + 1;
+        } catch {
+          return false;
+        }
+      })];
+      for (const element of candidates) {
+        if (!(element instanceof Element) || seen.has(element)) continue;
+        seen.add(element);
+        snapshots.push({
+          element,
+          scrollTop: Number(element.scrollTop) || 0,
+          scrollLeft: Number(element.scrollLeft) || 0
+        });
+      }
+    }
+    return snapshots;
+  }
+
+  function restoreTranscriptScrollPositions(snapshots: ReturnType<typeof captureTranscriptScrollPositions>) {
+    for (const snapshot of snapshots || []) {
+      const element = snapshot?.element;
+      if (!(element instanceof Element) || !element.isConnected) continue;
+      try {
+        element.scrollTop = snapshot.scrollTop;
+        element.scrollLeft = snapshot.scrollLeft;
+      } catch {
+        // A virtualized panel may replace its scroll container while loading.
+      }
+    }
+  }
+
+  function findDescriptionContainer(element: Element | null = null) {
+    const fromElement = element?.closest?.(
+      "ytd-text-inline-expander, ytd-expandable-video-description-body-renderer, #description-inline-expander, #description"
+    );
+    if (fromElement) return fromElement;
+    return document.querySelector(
+      "ytd-watch-metadata ytd-text-inline-expander, ytd-watch-metadata #description-inline-expander, " +
+      "#above-the-fold ytd-text-inline-expander, #above-the-fold #description-inline-expander"
+    );
+  }
+
+  function captureYouTubeInteractionState(candidate: Candidate, info: CaptionInfo) {
+    const player = candidate?.player || findPlayerForVideoId(info.videoId);
+    const video = findVideoForPlayer(player, candidate);
+    const button = getCaptionButton(player);
+    const pressedAttribute = button?.getAttribute?.("aria-pressed");
+    const descriptionContainer = findDescriptionContainer();
+    const viewControl = { userTookView: false, abort: new AbortController() };
+    const captionEdits = {
+      userTookControl: false,
+      track: null as { before: ReturnType<typeof readPlayerOptionSnapshot>; after: ReturnType<typeof readPlayerOptionSnapshot> } | null,
+      button: null as { element: HTMLElement; before: boolean; after: boolean } | null,
+      modes: new Map<TextTrack, { before: TextTrackMode; after: TextTrackMode }>(),
+      expectedModes: new Map(captureTextTrackModes(video).map(({ track, mode }) => [track, mode]))
+    };
+    for (const type of ["wheel", "touchstart", "pointerdown", "keydown"] ) window.addEventListener(type, event => {
+      if (event.isTrusted) viewControl.userTookView = true;
+    }, { capture: true, passive: true, signal: viewControl.abort.signal });
+    for (const type of ["click", "keydown"]) window.addEventListener(type, event => {
+      if (!event.isTrusted) return;
+      const target = event.composedPath().find(node => node instanceof Element) as Element | undefined;
+      const captionControl = target?.closest(".ytp-subtitles-button, .ytp-caption-button");
+      const menu = target?.closest(".ytp-settings-menu");
+      const label = target?.closest(".ytp-menuitem")?.querySelector(".ytp-menuitem-label")?.textContent || "";
+      const heading = target?.closest(".ytp-panel")?.querySelector(".ytp-panel-header")?.textContent || "";
+      const captionMenu = menu && /자막|자동\s*번역|subtitles?|captions?|auto.?translate/i.test(`${label} ${heading}`);
+      const captionShortcut = event instanceof KeyboardEvent && event.key.toLowerCase() === "c" &&
+        !event.ctrlKey && !event.metaKey && !event.altKey && !target?.closest("input, textarea, [contenteditable]");
+      if ((captionControl && player?.contains(captionControl)) || (captionMenu && player?.contains(menu)) || captionShortcut) captionEdits.userTookControl = true;
+    }, { capture: true, passive: true, signal: viewControl.abort.signal });
+    return {
+      viewControl, captionEdits, videoId: info.videoId,
+      player,
+      video,
+      captionButton: button,
+      captionButtonWasPressed: pressedAttribute === "true"
+        ? true
+        : pressedAttribute === "false" ? false : null,
+      previousTrack: readPlayerOptionSnapshot(player, "captions", "track"),
+      captionsModuleWasLoaded: readCaptionsModuleLoaded(player),
+      captionsModuleLoadedByExtension: false,
+      transcriptPanelWasOpen: transcriptPanelIsOpen(),
+      transcriptPanelOpenedByExtension: false,
+      transcriptScrolledByExtension: false,
+      transcriptScrollPositions: captureTranscriptScrollPositions(),
+      descriptionContainer,
+      descriptionWasExpanded: descriptionIsExpanded(descriptionContainer),
+      descriptionExpandedByExtension: false,
+      activeElement: document.activeElement instanceof HTMLElement ? document.activeElement : null,
+      pageScrollX: Number(window.scrollX) || 0,
+      pageScrollY: Number(window.scrollY) || 0
+    };
+  }
+
+  function ensureCaptionsModuleForTask(state: InteractionState) {
+    const player = state?.player;
+    if (!player || typeof player.loadModule !== "function") return;
+    if (state.captionsModuleWasLoaded !== false || state.captionsModuleLoadedByExtension) return;
+    try {
+      state.captionsModuleLoadedByExtension = mutateCaptions(state, () => player.loadModule!("captions"));
+    } catch {
+      // setOption or the ordinary captions button may still load the module.
+    }
+  }
+
+  function makeCaptionTrackDescriptor(player: YouTubePlayer | null, rawTrack: RawTrack, translationLanguageCode: string) {
+    const requestedVssId = String(rawTrack?.vssId || "");
+    const requestedLanguage = normalizeLanguageCode(rawTrack?.languageCode).toLowerCase();
+    const requestedKind = String(rawTrack?.kind || "").toLowerCase();
+    const trackList = safePlayerOption(player, "captions", "tracklist");
+    const matchingPlayerTrack = Array.isArray(trackList)
+      ? trackList.find((track) => {
+        const vssId = String(track?.vssId || track?.vss_id || "");
+        if (requestedVssId && vssId === requestedVssId) return true;
+        const language = normalizeLanguageCode(track?.languageCode).toLowerCase();
+        const kind = String(track?.kind || "").toLowerCase();
+        return Boolean(requestedLanguage) && language === requestedLanguage && kind === requestedKind;
+      })
+      : null;
+
+    const descriptor = matchingPlayerTrack && typeof matchingPlayerTrack === "object"
+      ? { ...matchingPlayerTrack }
+      : {};
+    descriptor.languageCode = normalizeLanguageCode(
+      descriptor.languageCode || rawTrack?.languageCode
+    );
+    descriptor.kind = String(descriptor.kind ?? rawTrack?.kind ?? "");
+    descriptor.name = descriptor.name || textFromRuns(rawTrack?.name);
+    descriptor.vssId = String(descriptor.vssId || descriptor.vss_id || rawTrack?.vssId || "");
+    descriptor.vss_id = String(descriptor.vss_id || descriptor.vssId || rawTrack?.vssId || "");
+
+    const target = normalizeLanguageCode(translationLanguageCode);
+    if (target) descriptor.translationLanguage = target;
+    else delete descriptor.translationLanguage;
+    return descriptor;
+  }
+
+  function applyCaptionTrack(player: YouTubePlayer | null, rawTrack: RawTrack, translationLanguageCode: string, interactionState: InteractionState | null = null) {
+    if (!player || typeof player.setOption !== "function") return false;
+    if (interactionState) ensureCaptionsModuleForTask(interactionState);
+    try {
+      const apply = () => {
+        player.setOption!("captions", "track", makeCaptionTrackDescriptor(player, rawTrack, translationLanguageCode));
+        try { player.setOption!("captions", "reload", true); } catch { /* Optional API. */ }
+      };
+      if (interactionState) return mutateCaptions(interactionState, apply);
+      apply(); return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function collectPlayerCaptionUrls(player: YouTubePlayer | null, candidate: Candidate, capture: RequestCapture) {
+    if (!capture) return;
+    capture.addUrlsFrom(safePlayerResponse(player));
+    capture.addUrlsFrom(candidate?.response);
+    capture.addUrlsFrom(safePlayerOption(player, "captions", "track"));
+    capture.addUrlsFrom(safePlayerOption(player, "captions", "tracklist"));
+    capture.addUrlsFrom(safePlayerOption(player, "captions", "translationLanguages"));
+    try {
+      for (const entry of performance.getEntriesByType("resource")) capture.addUrlsFrom(entry?.name);
+    } catch {
+      // Ignore resource timing failures.
+    }
+  }
+
+  function getTextTrackEntries(video: HTMLVideoElement | null, rawTrack: RawTrack, translationLanguageCode: string, interactionState: InteractionState) {
+    if (!(video instanceof HTMLMediaElement) || !video.textTracks?.length) return [];
+    const targetLanguage = normalizeLanguageCode(translationLanguageCode || rawTrack?.languageCode).toLowerCase();
+    if (!targetLanguage) return [];
+    const owned = pageScope[SYNCED_CAPTION_STATE_KEY]?.trackByVideo?.get(video);
+    const name = normalizeVisibleText(textFromRuns(rawTrack?.name));
+    const id = String(rawTrack?.vssId || "");
+    const sorted = Array.from(video.textTracks).filter((track) => {
+      if (!["subtitles", "captions"].includes(track.kind) || track === owned ||
+          /^Browser Toolbox/i.test(track.label) || normalizeLanguageCode(track.language).toLowerCase() !== targetLanguage) return false;
+      const owner = Array.from(video.querySelectorAll("track")).find(element => element.track === track);
+      if (owner?.src && verifiedCaptionUrl(owner.src, getUrlVideoId(), rawTrack, translationLanguageCode)) return true;
+      return Boolean((id && track.id === id) || (name && normalizeVisibleText(track.label) === name));
+    });
+    // Same-language but otherwise ambiguous tracks are not interchangeable.
+    if (sorted.length !== 1) return [];
+
+    for (const track of sorted) {
+      try {
+        if (track.mode === "disabled") mutateCaptions(interactionState, () => { track.mode = "hidden"; });
+      } catch {
+        // Read whatever the browser exposes.
+      }
+      const cues = track.cues;
+      if (!cues || cues.length === 0) continue;
+      const entries = [];
+      for (let index = 0; index < cues.length; index += 1) {
+        const cue = cues[index];
+        entries.push({
+          startMs: Math.round(Number(cue.startTime || 0) * 1000),
+          durationMs: Math.max(0, Math.round((Number(cue.endTime || 0) - Number(cue.startTime || 0)) * 1000)),
+          text: String(cue.text || "").replace(/<[^>]+>/g, " ")
+        });
+      }
+      const finalized = finalizeEntries(entries);
+      if (finalized.length > 0) return finalized;
+    }
+    return [];
+  }
+
+  function playerIssuedUrlMatchesRequest(url: string, rawTrack: RawTrack, translationLanguageCode: string|null) {
+    if (!isTimedTextUrl(url)) return false;
+    const requestedSource = normalizeLanguageCode(rawTrack?.languageCode).toLowerCase();
+    const actualSource = normalizeLanguageCode(getUrlParameter(url, "lang")).toLowerCase();
+    if (requestedSource && actualSource && requestedSource !== actualSource) return false;
+
+    const requestedTranslation = normalizeLanguageCode(translationLanguageCode).toLowerCase();
+    const actualTranslation = normalizeLanguageCode(getUrlParameter(url, "tlang")).toLowerCase();
+    return requestedTranslation ? actualTranslation === requestedTranslation : !actualTranslation;
+  }
+
+  async function fetchCapturedUrls(capture: RequestCapture, rawTrack: RawTrack, translationLanguageCode: string, attemptedUrls: Set<string>) {
+    for (const url of capture.getUrls()) {
+      if (attemptedUrls.has(url)) continue;
+      attemptedUrls.add(url);
+      if (!playerIssuedUrlMatchesRequest(url, rawTrack, translationLanguageCode)) continue;
+      const result = await fetchCaptionUrl(url, translationLanguageCode, true);
+      if (result.entries.length > 0) {
+        return { ...result, format: "youtube-player-issued-timedtext" };
+      }
+    }
+    return null;
+  }
+
+  async function fetchTranscriptViaPlayerRequest(
+    candidate: Candidate,
+    info: CaptionInfo,
+    rawTrack: RawTrack,
+    translationLanguageCode: string,
+    interactionState: InteractionState
+  ) {
+    const player = interactionState?.player || candidate?.player || findPlayerForVideoId(info.videoId);
+    if (!player) return null;
+    const video = interactionState?.video || findVideoForPlayer(player, candidate);
+    const button = interactionState?.captionButton || getCaptionButton(player);
+    const capture = createActualYouTubeRequestCapture(info, rawTrack, translationLanguageCode);
+    const attemptedUrls = new Set<string>();
+
+    try {
+      applyCaptionTrack(player, rawTrack, translationLanguageCode, interactionState);
+      if (button && button.getAttribute("aria-pressed") !== "true") {
+        try {
+          mutateCaptions(interactionState, () => button.click());
+          await sleep(80);
+          applyCaptionTrack(player, rawTrack, translationLanguageCode, interactionState);
+        } catch {
+          // setOption may still load the track without clicking the button.
+        }
+      }
+
+      let forcedReload = false;
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < CAPTION_REQUEST_TIMEOUT_MS) {
+        collectPlayerCaptionUrls(player, candidate, capture);
+
+        const captured = await capture.getParsedResult();
+        if (captured?.entries?.length) return captured;
+
+        const fetched = await fetchCapturedUrls(capture, rawTrack, translationLanguageCode, attemptedUrls);
+        if (fetched?.entries?.length) return fetched;
+
+        const cueEntries = getTextTrackEntries(video, rawTrack, translationLanguageCode, interactionState);
+        if (cueEntries.length >= 3) {
+          return { entries: cueEntries, format: "html5-text-track" };
+        }
+
+        if (!forcedReload && Date.now() - startedAt > 2200) {
+          forcedReload = true;
+          applyCaptionTrack(player, rawTrack, translationLanguageCode, interactionState);
+        }
+
+        await sleep(220);
+      }
+      return null;
+    } finally {
+      capture.cleanup();
+    }
+  }
+
+  function* deepElementIterator(root: Document | ShadowRoot | Element): IterableIterator<Element> {
+    const stack: Array<Document | ShadowRoot | Element> = [root || document];
+    const visited = new Set<Node>();
+    while (stack.length) {
+      const node = stack.pop()!;
+      if (visited.has(node)) continue;
+      visited.add(node);
+      if (node instanceof Element && node.shadowRoot) stack.push(node.shadowRoot);
+      const children = Array.from(node.children);
+      for (let index = children.length - 1; index >= 0; index--) stack.push(children[index]);
+      if (node instanceof Element) yield node;
+    }
+  }
+
+  function deepQueryAll(root: Document | ShadowRoot | Element, predicate: (element: Element) => boolean) {
+    const output = [];
+    for (const element of deepElementIterator(root)) {
+      try {
+        if (predicate(element)) output.push(element);
+      } catch {
+        // Ignore inaccessible or transient elements.
+      }
+    }
+    return output;
+  }
+
+  function isTranscriptPanelElement(element: Element) {
+    if (!(element instanceof Element)) return false;
+    const tag = element.tagName.toLowerCase();
+    const targetId = String(element.getAttribute("target-id") || "").toLowerCase();
+    const identifier = String(element.getAttribute("panel-identifier") || "").toLowerCase();
+    return tag.includes("transcript") || targetId.includes("transcript") || identifier.includes("transcript");
+  }
+
+  function findTranscriptPanelRoots() {
+    return [...new Set(deepQueryAll(document, isTranscriptPanelElement))];
+  }
+
+  function elementIsVisible(element: Element|Document|null) {
+    if (!(element instanceof Element)) return false;
+    try {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" &&
+        style.visibility !== "hidden" && style.opacity !== "0" &&
+        element.getAttribute("aria-hidden") !== "true" &&
+        !(element as HTMLElement).hidden;
+    } catch {
+      return false;
+    }
+  }
+
+  function transcriptPanelIsOpen() {
+    return findTranscriptPanelRoots().some(elementIsVisible);
+  }
+
+  function descriptionIsExpanded(container: Element | null = null) {
+    const scope = container instanceof Element ? container : document;
+    const expandedContainer = (scope instanceof Element && scope.matches(
+      "ytd-text-inline-expander[is-expanded], ytd-expandable-video-description-body-renderer[is-expanded]"
+    ))
+      ? scope
+      : scope.querySelector?.(
+        "ytd-text-inline-expander[is-expanded], ytd-expandable-video-description-body-renderer[is-expanded]"
+      );
+    if (expandedContainer && elementIsVisible(expandedContainer)) return true;
+    const collapse = scope.querySelector?.(
+      "#collapse, tp-yt-paper-button#collapse, button[aria-label*='Show less'], button[aria-label*='간략히'], button[aria-label*='접기']"
+    );
+    return elementIsVisible(collapse);
+  }
+
+  function markTranscriptUiChanges(interactionState: InteractionState | null) {
+    if (!interactionState) return;
+    if (!interactionState.transcriptPanelWasOpen && transcriptPanelIsOpen()) {
+      interactionState.transcriptPanelOpenedByExtension = true;
+    }
+    if (
+      !interactionState.descriptionWasExpanded &&
+      descriptionIsExpanded(interactionState.descriptionContainer)
+    ) {
+      interactionState.descriptionExpandedByExtension = true;
+    }
+  }
+
+  function findTranscriptPanelCloseButton() {
+    for (const root of findTranscriptPanelRoots()) {
+      if (!elementIsVisible(root)) continue;
+      const direct = root.querySelector<HTMLElement>(
+        "#visibility-button button, button[aria-label*='Close transcript'], button[aria-label*='Close Transcript'], button[aria-label*='스크립트 닫기'], button[aria-label*='대본 닫기'], button[aria-label*='자막 닫기'], button[title*='Close transcript'], button[title*='Close Transcript'], button[title*='스크립트 닫기'], button[title*='대본 닫기'], button[title*='자막 닫기']"
+      );
+      if (direct && elementIsVisible(direct)) return direct;
+    }
+    return null;
+  }
+
+  async function restoreTranscriptUi(interactionState: InteractionState | null) {
+    if (!interactionState || interactionState.viewControl?.userTookView) return;
+
+    if (interactionState.transcriptPanelOpenedByExtension && !interactionState.transcriptPanelWasOpen) {
+      const closeButton = findTranscriptPanelCloseButton();
+      if (closeButton) {
+        try { closeButton.click(); } catch { /* Ignore a transient panel. */ }
+        await sleep(80);
+      }
+    }
+
+    if (interactionState.descriptionExpandedByExtension && !interactionState.descriptionWasExpanded) {
+      const scope = interactionState.descriptionContainer instanceof Element &&
+        interactionState.descriptionContainer.isConnected
+        ? interactionState.descriptionContainer
+        : findDescriptionContainer();
+      const collapse = scope?.querySelector<HTMLElement>(
+        "#collapse, tp-yt-paper-button#collapse, button[aria-label*='Show less'], button[aria-label*='간략히'], button[aria-label*='접기']"
+      );
+      if (collapse && elementIsVisible(collapse)) {
+        try { collapse.click(); } catch { /* Ignore a transient description. */ }
+        await sleep(60);
+      }
+    }
+
+    if (interactionState.transcriptPanelWasOpen && interactionState.transcriptScrolledByExtension && !interactionState.viewControl?.userTookView) {
+      restoreTranscriptScrollPositions(interactionState.transcriptScrollPositions);
+    }
+  }
+
+  async function restoreYouTubeInteractionState(interactionState: InteractionState | null) {
+    if (!interactionState) return;
+    // Old UI snapshots must never be restored onto a different video.
+    if (interactionState.videoId && getUrlVideoId() && getUrlVideoId() !== interactionState.videoId) return;
+    const player = interactionState.player;
+    if (player?.isConnected === false || interactionState.video?.isConnected === false) return;
+    const edits = interactionState.captionEdits;
+    const ownsCaptions = ownsCaptionChanges(interactionState);
+
+    if (ownsCaptions && edits.track && player && typeof player.setOption === "function") {
+      try {
+        const previous = edits.track.before.value;
+        player.setOption("captions", "track", previous == null ? {} : clonePlayerOptionValue(previous));
+        try { player.setOption("captions", "reload", true); } catch { /* Optional API. */ }
+      } catch {
+        // The captions button and text-track restoration below still restore visible state.
+      }
+    }
+
+    const button = edits.button?.element;
+    if (ownsCaptions && !edits.userTookControl && button?.isConnected && edits.button) {
+      const currentlyPressed = readCaptionButtonPressed(button);
+      if (currentlyPressed === edits.button.after && currentlyPressed !== edits.button.before) {
+        try { button.click(); } catch { /* Ignore restore failure. */ }
+        await sleep(60);
+      }
+    }
+
+    if (ownsCaptions && !edits.userTookControl) restoreTextTrackModes(edits.modes);
+    await restoreTranscriptUi(interactionState);
+
+    if (
+      interactionState.captionsModuleLoadedByExtension &&
+      ownsCaptions && !edits.userTookControl &&
+      interactionState.captionsModuleWasLoaded === false &&
+      player && typeof player.unloadModule === "function"
+    ) {
+      try { player.unloadModule("captions"); } catch { /* Ignore restore failure. */ }
+    }
+
+    const changedView = interactionState.transcriptPanelOpenedByExtension || interactionState.descriptionExpandedByExtension;
+    if (changedView && !interactionState.viewControl?.userTookView) {
+      try { window.scrollTo(interactionState.pageScrollX, interactionState.pageScrollY); } catch { /* Target may be gone. */ }
+      const activeElement = interactionState.activeElement;
+      if (activeElement?.isConnected && typeof activeElement.focus === "function") {
+        try { activeElement.focus({ preventScroll: true }); } catch { /* No focus() fallback that scrolls the page. */ }
+      }
+    }
+  }
+
+  function getSyncedCaptionStateRoot() {
+    const existing = pageScope[SYNCED_CAPTION_STATE_KEY];
+    if (
+      existing &&
+      existing.version === SYNCED_CAPTION_STATE_VERSION &&
+      existing.trackByVideo instanceof WeakMap
+    ) {
+      return existing;
+    }
+
+    try {
+      if (existing?.current?.cleanup) {
+        void existing.current.cleanup({ restoreCaptionButton: true, restoreNativeTrackModes: true });
+      }
+    } catch {
+      // A stale manager from an earlier script execution is best-effort only.
+    }
+
+    const root: SyncedRoot = {
+      version: SYNCED_CAPTION_STATE_VERSION,
+      current: null,
+      trackByVideo: new WeakMap()
+    };
+
+    try {
+      Object.defineProperty(globalThis, SYNCED_CAPTION_STATE_KEY, {
+        value: root,
+        configurable: true,
+        writable: true
+      });
+    } catch {
+      pageScope[SYNCED_CAPTION_STATE_KEY] = root;
+    }
+    return root;
+  }
+
+  function readCaptionButtonPressed(button: Element | null) {
+    if (!(button instanceof Element)) return null;
+    const value = button.getAttribute("aria-pressed");
+    return value === "true" ? true : value === "false" ? false : null;
+  }
+
+  async function waitForCaptionButtonState(button: Element | null, expected: boolean|null, timeoutMs = 900) {
+    if (!(button instanceof Element) || typeof expected !== "boolean") return false;
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      if (readCaptionButtonPressed(button) === expected) return true;
+      await sleep(40);
+    }
+    return readCaptionButtonPressed(button) === expected;
+  }
+
+  function clearTextTrackCues(track: TextTrack) {
+    if (!track?.cues) return;
+    for (let index = track.cues.length - 1; index >= 0; index -= 1) {
+      try { track.removeCue(track.cues[index]); } catch { /* Ignore a disappearing cue. */ }
+    }
+  }
+
+  function isVisualCaptionTrack(track: TextTrack) {
+    const kind = String(track?.kind || "").toLowerCase();
+    return kind === "captions" || kind === "subtitles";
+  }
+
+  function getReusableSyncedCaptionTrack(root: SyncedRoot, video: HTMLVideoElement) {
+    let track = root.trackByVideo.get(video) || null;
+    if (track) {
+      try { track.mode = "disabled"; } catch { /* Continue with the existing track. */ }
+      clearTextTrackCues(track);
+      return track;
+    }
+
+    track = video.addTextTrack("captions", SYNCED_CAPTION_TRACK_LABEL, "");
+    root.trackByVideo.set(video, track);
+    return track;
+  }
+
+  function buildSyncedCaptionCueSpecs(rawEntries: readonly unknown[], video: HTMLVideoElement) {
+    const sourceEntries = finalizeEntries(rawEntries)
+      .sort((first, second) => first.startMs - second.startMs);
+    if (sourceEntries.length === 0) {
+      throw new Error("동기화 자막으로 표시할 문장을 찾지 못했습니다.");
+    }
+    if (sourceEntries.length > MAX_SYNCED_CAPTION_CUES) {
+      throw new Error(`자막 문장이 ${MAX_SYNCED_CAPTION_CUES.toLocaleString()}개를 넘어 브라우저 자막 트랙으로 표시할 수 없습니다.`);
+    }
+
+    const grouped = [];
+    for (const entry of sourceEntries) {
+      const startMs = Math.max(0, Math.round(Number(entry.startMs) || 0));
+      const durationMs = Math.max(0, Math.round(Number(entry.durationMs) || 0));
+      const text = normalizeVisibleText(entry.text);
+      if (!text) continue;
+
+      const previous = grouped[grouped.length - 1];
+      if (previous && Math.abs(previous.startMs - startMs) <= 10) {
+        if (!previous.texts.includes(text)) previous.texts.push(text);
+        previous.durationMs = Math.max(previous.durationMs, durationMs);
+        continue;
+      }
+      grouped.push({ startMs, durationMs, texts: [text] });
+    }
+
+    const duration = Number(video?.duration);
+    const finiteDuration = Number.isFinite(duration) && duration > 0 ? duration : null;
+    const specs = [];
+
+    for (let index = 0; index < grouped.length; index += 1) {
+      const entry = grouped[index];
+      const startTime = entry.startMs / 1000;
+      const nextStartTime = grouped[index + 1]?.startMs / 1000;
+      let endTime = entry.durationMs > 0
+        ? startTime + (entry.durationMs / 1000)
+        : Number.isFinite(nextStartTime) && nextStartTime > startTime
+          ? nextStartTime
+          : finiteDuration;
+
+      if (finiteDuration != null && finiteDuration > startTime) {
+        endTime = Math.min(Number(endTime), finiteDuration);
+      }
+      if (endTime === null || !(Number.isFinite(endTime) && endTime > startTime + 0.01)) {
+        continue;
+      }
+
+      specs.push({
+        startTime,
+        endTime,
+        text: entry.texts.join("\n")
+      });
+    }
+
+    if (specs.length === 0) {
+      throw new Error("자막 문장의 재생 시간을 유효한 브라우저 자막 큐로 변환하지 못했습니다.");
+    }
+    return specs;
+  }
+
+  function makeSyncedCaptionStatus(manager: SyncedManager | null) {
+    if (!manager || manager.cleaned) return { active: false };
+    const cueCount = Number(manager.track?.cues?.length) || 0;
+    return {
+      active: manager.track?.mode === "hidden" && cueCount > 0,
+      videoId: manager.videoId,
+      sourceTrackId: manager.sourceTrackId,
+      sourceTrackLabel: manager.sourceTrackLabel,
+      sourceLanguageCode: manager.sourceLanguageCode,
+      translationLanguageCode: manager.translationLanguageCode,
+      translationLanguageName: manager.translationLanguageName,
+      entryCount: cueCount,
+      format: manager.format,
+      installedAt: manager.installedAt
+    };
+  }
+
+  async function removeSyncedCaptionManager(options: CleanupOptions = {}) {
+    const root = getSyncedCaptionStateRoot();
+    const manager = root.current;
+    if (!manager?.cleanup) return { active: false, removed: false };
+    await manager.cleanup({
+      restoreCaptionButton: options.restoreCaptionButton !== false,
+      restoreNativeTrackModes: options.restoreNativeTrackModes !== false
+    });
+    return { active: false, removed: true };
+  }
+
+  async function readSyncedCaptionStatus() {
+    const root = getSyncedCaptionStateRoot();
+    const manager = root.current;
+    if (!manager || manager.cleaned) return { active: false };
+
+    const currentVideoId = getUrlVideoId();
+    if (
+      !(manager.video instanceof HTMLVideoElement) ||
+      !manager.video.isConnected ||
+      (currentVideoId && manager.videoId && currentVideoId !== manager.videoId)
+    ) {
+      await manager.cleanup({ restoreCaptionButton: true, restoreNativeTrackModes: true });
+      return { active: false };
+    }
+
+    try {
+      manager.enforceTrackModes?.();
+    } catch {
+      await manager.cleanup({ restoreCaptionButton: true, restoreNativeTrackModes: true });
+      return { active: false };
+    }
+    return makeSyncedCaptionStatus(manager);
+  }
+
+  async function installSyncedCaptionTrack(
+    candidate: Candidate,
+    info: CaptionInfo,
+    publicTrack: PublicTrack,
+    translationLanguageCode: string,
+    translationLanguageName: string,
+    fetched: FetchedCaptions
+  ) {
+    const currentVideoId = getUrlVideoId();
+    if (currentVideoId && currentVideoId !== info.videoId) {
+      throw new Error("자막을 준비하는 동안 영상이 변경되었습니다. 자막 목록을 새로고침한 뒤 다시 적용하세요.");
+    }
+
+    let player = candidate?.player || null;
+    const initialPlayerData = safeVideoData(player);
+    const playerVideoId = String(
+      initialPlayerData?.video_id ||
+      initialPlayerData?.videoId ||
+      getResponseVideoId(safePlayerResponse(player)) ||
+      ""
+    ).trim();
+    if (!player || (info.videoId && playerVideoId && playerVideoId !== info.videoId)) {
+      player = findPlayerForVideoId(info.videoId);
+    }
+    if (!player) {
+      throw new Error("현재 영상과 일치하는 유튜브 플레이어를 찾지 못했습니다.");
+    }
+
+    const video = findVideoForPlayer(player, candidate);
+    if (!(video instanceof HTMLVideoElement) || !video.isConnected) {
+      throw new Error("현재 유튜브 영상 요소를 찾지 못했습니다.");
+    }
+    if (typeof VTTCue !== "function") {
+      throw new Error("이 Chrome 환경에서는 브라우저 자막 큐 API를 사용할 수 없습니다.");
+    }
+
+    const liveDetails = info.response?.microformat?.playerMicroformatRenderer?.liveBroadcastDetails;
+    if (Number(video.duration) === Infinity || liveDetails?.isLiveNow === true) {
+      throw new Error("실시간 방송은 자막이 계속 추가되므로 현재 동기화 자막 기능으로 처리할 수 없습니다.");
+    }
+
+    const cueSpecs = buildSyncedCaptionCueSpecs(fetched.entries, video);
+    checkTask();
+    await removeSyncedCaptionManager({ restoreCaptionButton: true, restoreNativeTrackModes: true });
+    checkTask();
+
+    const root = getSyncedCaptionStateRoot();
+    const track = getReusableSyncedCaptionTrack(root, video);
+    const nativeTrackModes = new Map<TextTrack, TextTrackMode>();
+    for (const existingTrack of Array.from(video.textTracks || [])) {
+      if (existingTrack === track || !isVisualCaptionTrack(existingTrack)) continue;
+      nativeTrackModes.set(existingTrack, existingTrack.mode);
+    }
+
+    const captionButton = getCaptionButton(player);
+    const captionButtonWasPressed = readCaptionButtonPressed(captionButton);
+    const visibleNativeCaptionText = normalizeVisibleText(
+      player?.querySelector?.(".ytp-caption-window-container")?.textContent || ""
+    );
+    if (captionButtonWasPressed == null && visibleNativeCaptionText) {
+      throw new Error("유튜브 기본 자막의 켜짐 상태를 확인하지 못해 동기화 자막을 중복 없이 표시할 수 없습니다.");
+    }
+
+    let nativeCaptionTurnedOff = false;
+    try {
+      if (captionButtonWasPressed === true) {
+        (captionButton as HTMLElement).click();
+        nativeCaptionTurnedOff = await waitForCaptionButtonState(captionButton, false);
+        if (!nativeCaptionTurnedOff) {
+          throw new Error("유튜브 기본 자막을 끄지 못해 동기화 자막을 중복 없이 표시할 수 없습니다.");
+        }
+      }
+
+      for (const existingTrack of nativeTrackModes.keys()) {
+        try { existingTrack.mode = "disabled"; } catch { /* Continue with the remaining tracks. */ }
+      }
+
+      try { track.mode = "hidden"; } catch { /* Adding cues can still succeed. */ }
+      clearTextTrackCues(track);
+      for (let index = 0; index < cueSpecs.length; index += 1) {
+        const spec = cueSpecs[index];
+        const cue = new VTTCue(spec.startTime, spec.endTime, spec.text);
+        cue.id = `browser-toolbox-${index + 1}`;
+        try {
+          cue.align = "center";
+          cue.position = 50;
+          cue.size = 92;
+          cue.line = -3;
+          cue.snapToLines = true;
+        } catch {
+          // Timing and text remain valid when optional rendering hints are unavailable.
+        }
+        track.addCue(cue);
+        if ((index + 1) % 500 === 0) await sleep(0);
+      }
+      track.mode = "hidden";
+
+      const actualCueCount = Number(track.cues?.length) || 0;
+      if (track.mode !== "hidden" || actualCueCount !== cueSpecs.length) {
+        throw new Error(`브라우저 자막 트랙을 확인하지 못했습니다. 요청 ${cueSpecs.length}개, 적용 ${actualCueCount}개.`);
+      }
+    } catch (error) {
+      try { track.mode = "disabled"; } catch { /* Ignore cleanup failure. */ }
+      clearTextTrackCues(track);
+      for (const [existingTrack, mode] of nativeTrackModes) {
+        try { existingTrack.mode = mode; } catch { /* Ignore restore failure. */ }
+      }
+      if (captionButtonWasPressed === true && nativeCaptionTurnedOff && captionButton?.isConnected) {
+        try {
+          (captionButton as HTMLElement).click();
+          await waitForCaptionButtonState(captionButton, true);
+        } catch {
+          // Preserve the original application error.
+        }
+      }
+      notifySyncedCaptionOverlayChanged();
+      throw error;
+    }
+
+    const manager: SyncedManager = {
+      cleaned: false,
+      player,
+      video,
+      track,
+      videoId: info.videoId,
+      sourceTrackId: String(publicTrack?.id || ""),
+      sourceTrackLabel: String(publicTrack?.label || publicTrack?.name || publicTrack?.languageCode || "자막"),
+      sourceLanguageCode: String(publicTrack?.languageCode || ""),
+      translationLanguageCode: String(translationLanguageCode || ""),
+      translationLanguageName: String(translationLanguageName || ""),
+      format: String(fetched?.format || "captions"),
+      installedAt: Date.now(),
+      captionButtonWasPressed,
+      nativeTrackModes,
+      intervalId: 0,
+      pageHideListener: () => {},
+      navigateListener: () => {},
+      pageDataListener: () => {},
+      metadataListener: () => {},
+      textTrackListener: () => {},
+      captionButtonObserver: null,
+      observedCaptionButton: null,
+      enforcing: false,
+      enforceTrackModes: () => {},
+      cleanup: async () => {},
+      observeCaptionButton: () => {}
+    };
+
+    manager.cleanup = async (cleanupOptions: CleanupOptions = {}) => {
+      if (manager.cleaned) return;
+      manager.cleaned = true;
+      if (root.current === manager) root.current = null;
+
+      if (manager.intervalId) clearInterval(manager.intervalId);
+      try { window.removeEventListener("pagehide", manager.pageHideListener, true); } catch { /* Ignore. */ }
+      try { document.removeEventListener("yt-navigate-start", manager.navigateListener, true); } catch { /* Ignore. */ }
+      try { document.removeEventListener("yt-page-data-updated", manager.pageDataListener, true); } catch { /* Ignore. */ }
+      try { video.removeEventListener("loadedmetadata", manager.metadataListener, true); } catch { /* Ignore. */ }
+      try { video.textTracks?.removeEventListener?.("addtrack", manager.textTrackListener); } catch { /* Ignore. */ }
+      try { manager.captionButtonObserver?.disconnect?.(); } catch { /* Ignore. */ }
+
+      try { track.mode = "disabled"; } catch { /* Ignore. */ }
+      clearTextTrackCues(track);
+
+      if (cleanupOptions.restoreNativeTrackModes !== false) {
+        for (const [existingTrack, mode] of manager.nativeTrackModes) {
+          try { existingTrack.mode = mode; } catch { /* Ignore a replaced track. */ }
+        }
+      }
+
+      if (cleanupOptions.restoreCaptionButton !== false && typeof manager.captionButtonWasPressed === "boolean") {
+        const currentButton = getCaptionButton(manager.player);
+        const currentPressed = readCaptionButtonPressed(currentButton);
+        if (currentButton && currentPressed !== manager.captionButtonWasPressed) {
+          try {
+            (currentButton as HTMLElement).click();
+            await waitForCaptionButtonState(currentButton, manager.captionButtonWasPressed);
+          } catch {
+            // The page may already be navigating away.
+          }
+        }
+      }
+      notifySyncedCaptionOverlayChanged();
+    };
+
+    const stopForNativeCaptionRequest = () => {
+      void manager.cleanup({ restoreCaptionButton: false, restoreNativeTrackModes: false });
+    };
+
+    manager.observeCaptionButton = () => {
+      if (manager.cleaned) return;
+      const currentButton = getCaptionButton(manager.player);
+      if (currentButton === manager.observedCaptionButton) return;
+      try { manager.captionButtonObserver?.disconnect?.(); } catch { /* Ignore. */ }
+      manager.observedCaptionButton = currentButton;
+      manager.captionButtonObserver = null;
+      if (!currentButton) return;
+
+      const observer = new MutationObserver(() => {
+        if (manager.cleaned) return;
+        if (readCaptionButtonPressed(currentButton) === true) stopForNativeCaptionRequest();
+      });
+      try {
+        observer.observe(currentButton, { attributes: true, attributeFilter: ["aria-pressed"] });
+        manager.captionButtonObserver = observer;
+      } catch {
+        observer.disconnect();
+      }
+    };
+
+    manager.enforceTrackModes = () => {
+      if (manager.cleaned || manager.enforcing) return;
+      const currentButton = getCaptionButton(manager.player);
+      if (readCaptionButtonPressed(currentButton) === true) {
+        stopForNativeCaptionRequest();
+        return;
+      }
+
+      manager.enforcing = true;
+      try {
+        manager.observeCaptionButton();
+        for (const existingTrack of Array.from(video.textTracks || [])) {
+          if (existingTrack === track || !isVisualCaptionTrack(existingTrack)) continue;
+          if (!manager.nativeTrackModes.has(existingTrack)) {
+            manager.nativeTrackModes.set(existingTrack, existingTrack.mode);
+          }
+          try {
+            if (existingTrack.mode !== "disabled") existingTrack.mode = "disabled";
+          } catch {
+            // A browser-managed track can disappear while the player switches sources.
+          }
+        }
+        if (track.mode !== "hidden") track.mode = "hidden";
+      } finally {
+        manager.enforcing = false;
+      }
+    };
+
+    const cleanupForChangedVideo = () => {
+      void manager.cleanup({ restoreCaptionButton: true, restoreNativeTrackModes: true });
+    };
+    manager.pageHideListener = () => {
+      void manager.cleanup({ restoreCaptionButton: false, restoreNativeTrackModes: false });
+    };
+    manager.navigateListener = cleanupForChangedVideo;
+    manager.pageDataListener = () => {
+      window.setTimeout(() => {
+        if (manager.cleaned) return;
+        const currentVideoId = getUrlVideoId();
+        if (!video.isConnected || (currentVideoId && currentVideoId !== manager.videoId)) {
+          cleanupForChangedVideo();
+        } else {
+          manager.enforceTrackModes();
+        }
+      }, 80);
+    };
+    manager.metadataListener = manager.pageDataListener;
+    manager.textTrackListener = () => {
+      window.setTimeout(() => manager.enforceTrackModes(), 0);
+    };
+
+    window.addEventListener("pagehide", manager.pageHideListener, true);
+    document.addEventListener("yt-navigate-start", manager.navigateListener, true);
+    document.addEventListener("yt-page-data-updated", manager.pageDataListener, true);
+    video.addEventListener("loadedmetadata", manager.metadataListener, true);
+    video.textTracks?.addEventListener?.("addtrack", manager.textTrackListener);
+
+    manager.observeCaptionButton();
+    manager.intervalId = window.setInterval(() => {
+      if (manager.cleaned) return;
+      const currentVideoId = getUrlVideoId();
+      if (!video.isConnected || (currentVideoId && currentVideoId !== manager.videoId)) {
+        cleanupForChangedVideo();
+        return;
+      }
+      manager.enforceTrackModes();
+    }, SYNCED_CAPTION_VERIFY_INTERVAL_MS);
+
+    root.current = manager;
+    manager.enforceTrackModes();
+    notifySyncedCaptionOverlayChanged();
+    return makeSyncedCaptionStatus(manager);
+  }
+
+  function transcriptPanelHasRows() {
+    return deepQueryAll(document, (element) => {
+      const tag = element.tagName.toLowerCase();
+      const className = String(element.className || "").toLowerCase();
+      if (tag === "transcript-segment-view-model" || tag === "ytd-transcript-segment-renderer") return true;
+      if (className.includes("segment-text")) {
+        return Boolean(element.closest?.('[target-id*="transcript"], ytd-transcript-renderer, ytd-transcript-search-panel-renderer'));
+      }
+      if (element.id === "segments-container") {
+        return Boolean(element.closest?.('[target-id*="transcript"], ytd-transcript-renderer, ytd-transcript-search-panel-renderer')) &&
+          element.children.length > 0;
+      }
+      return false;
+    }).length > 0;
+  }
+
+  function transcriptPanelIsReady() {
+    return transcriptPanelIsOpen() && (transcriptPanelHasRows() || findTranscriptPanelRoots().some(elementIsVisible));
+  }
+
+  async function waitForTranscriptPanelReady(timeoutMs = 1800) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      if (transcriptPanelIsReady()) return true;
+      await sleep(120);
+    }
+    return transcriptPanelIsReady();
+  }
+
+  function parseDomTimestamp(value: string) {
+    const text = normalizeVisibleText(value);
+    const match = text.match(/(?:^|\s)(\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?)(?:\s|$)/);
+    return match ? parseTimestampLabelToMs(match[1]) : null;
+  }
+
+  function extractDomTranscriptRow(row: Element) {
+    const timestampCandidates = deepQueryAll(row, (element) => {
+      const className = String(element.className || "").toLowerCase();
+      return className.includes("timestamp") || element.tagName === "BUTTON";
+    });
+    let startMs = null;
+    for (const element of timestampCandidates) {
+      startMs = parseDomTimestamp(element.textContent || element.getAttribute("aria-label") || "");
+      if (startMs != null) break;
+    }
+    if (startMs == null) startMs = parseDomTimestamp(row.textContent || "");
+    if (startMs == null) return null;
+
+    const textCandidates = deepQueryAll(row, (element) => {
+      const className = String(element.className || "").toLowerCase();
+      const tag = element.tagName.toLowerCase();
+      return className.includes("segment-text") || className.includes("attributed-string") || tag === "yt-formatted-string";
+    });
+    let text = "";
+    for (const element of textCandidates) {
+      const candidate = normalizeVisibleText(element.textContent || element.getAttribute("aria-label") || "");
+      if (!candidate || parseDomTimestamp(candidate) != null) continue;
+      text = candidate;
+      break;
+    }
+    if (!text) {
+      const timestampText = timestampCandidates.map((element) => normalizeVisibleText(element.textContent || "")).find(Boolean) || "";
+      text = normalizeVisibleText(row.textContent || "");
+      if (timestampText && text.startsWith(timestampText)) text = normalizeVisibleText(text.slice(timestampText.length));
+      text = text.replace(/^\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?\s*/, "").trim();
+    }
+    return text ? { startMs, durationMs: 0, text } : null;
+  }
+
+  function collectDomTranscriptEntries() {
+    const entries = [];
+    const rows = deepQueryAll(document, (element) => {
+      const tag = element.tagName.toLowerCase();
+      const role = String(element.getAttribute("role") || "").toLowerCase();
+      return tag === "transcript-segment-view-model" || tag === "ytd-transcript-segment-renderer" ||
+        (role === "listitem" && Boolean(element.closest?.('[target-id*="transcript"], ytd-transcript-renderer, ytd-transcript-search-panel-renderer')));
+    });
+    for (const row of rows) {
+      const parsed = extractDomTranscriptRow(row);
+      if (parsed) entries.push(parsed);
+    }
+    return finalizeEntries(entries).sort((first, second) => first.startMs - second.startMs);
+  }
+
+  async function scrollTranscriptPanelsAndCollect(interactionState: InteractionState | null = null) {
+    const collected = new Map<string, CaptionEntry>();
+    const collect = () => {
+      for (const entry of collectDomTranscriptEntries()) {
+        collected.set(`${entry.startMs}|${entry.text}`, entry);
+      }
+    };
+    collect();
+
+    const scrollContainers = deepQueryAll(document, (element) => {
+      if (!element.closest?.('[target-id*="transcript"], ytd-transcript-renderer, ytd-transcript-search-panel-renderer')) return false;
+      return element.scrollHeight > element.clientHeight + 8;
+    }).sort((first, second) => second.scrollHeight - first.scrollHeight).slice(0, 2);
+
+    for (const container of scrollContainers) {
+      const originalScrollTop = container.scrollTop;
+      let stablePasses = 0;
+      let previousSize = collected.size;
+      try {
+        if (interactionState?.viewControl?.userTookView) throw new Error("자막 추출 중 사용자가 화면을 조작하여 자동 스크롤을 중단했습니다.");
+        if (interactionState) interactionState.transcriptScrolledByExtension = true;
+        container.scrollTop = 0;
+        await sleep(100);
+        collect();
+        for (let pass = 0; pass < 30; pass += 1) {
+          if (interactionState?.viewControl?.userTookView) throw new Error("사용자 스크롤을 유지하기 위해 자막 수집을 중단했습니다.");
+          const nextTop = Math.min(container.scrollHeight, container.scrollTop + Math.max(240, container.clientHeight * 0.85));
+          container.scrollTop = nextTop;
+          await sleep(120);
+          collect();
+          if (collected.size === previousSize) stablePasses += 1;
+          else {
+            previousSize = collected.size;
+            stablePasses = 0;
+          }
+          const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 4;
+          if (atBottom && stablePasses >= 2) break;
+        }
+      } finally {
+        if (!interactionState?.viewControl?.userTookView) container.scrollTop = originalScrollTop;
+      }
+    }
+
+    const entries = [...collected.values()].sort((first, second) => first.startMs - second.startMs);
+    for (let index = 0; index < entries.length; index += 1) {
+      const next = entries[index + 1];
+      if (entries[index].durationMs <= 0 && next && next.startMs > entries[index].startMs) {
+        entries[index].durationMs = next.startMs - entries[index].startMs;
+      }
+    }
+    return entries;
+  }
+
+  async function openTranscriptPanel(interactionState: InteractionState | null = null) {
+    if (transcriptPanelIsOpen()) return true;
+
+    const directCandidates: Element[] = [];
+    const addCandidate = (element: Element) => {
+      if (element instanceof Element && !directCandidates.includes(element)) directCandidates.push(element);
+    };
+
+    for (const selector of [
+      "ytd-video-description-transcript-section-renderer button",
+      "ytd-video-description-transcript-section-renderer",
+      "button[aria-label='Show transcript']",
+      "button[aria-label*='Show transcript']",
+      "button[aria-label*='스크립트 표시']",
+      "button[aria-label*='대본 표시']",
+      "button[aria-label*='文字起こし']",
+      "button[aria-label*='Transcripción']"
+    ]) {
+      try { document.querySelectorAll(selector).forEach(addCandidate); } catch { /* Ignore selector changes. */ }
+    }
+
+    for (const item of document.querySelectorAll("ytd-menu-service-item-renderer, tp-yt-paper-item")) {
+      const html = String(item.outerHTML || "");
+      if (html.includes("getTranscriptEndpoint") || html.includes("searchable-transcript")) addCandidate(item);
+    }
+
+    for (const candidate of directCandidates) {
+      if (!elementIsVisible(candidate)) continue;
+      try {
+        ((candidate.closest?.("button, ytd-menu-service-item-renderer, tp-yt-paper-item") || candidate) as HTMLElement).click();
+        if (await waitForTranscriptPanelReady()) {
+          markTranscriptUiChanges(interactionState);
+          return true;
+        }
+      } catch {
+        // Try the next explicit transcript control.
+      }
+    }
+
+    const expand = document.querySelector<HTMLElement>(
+      "ytd-text-inline-expander #expand, #description-inline-expander #expand, ytd-watch-metadata #description #expand"
+    );
+    if (expand && elementIsVisible(expand)) {
+      if (interactionState && !interactionState.descriptionContainer) {
+        interactionState.descriptionContainer = findDescriptionContainer(expand);
+      }
+      try { expand.click(); } catch { /* Ignore. */ }
+      await sleep(350);
+      markTranscriptUiChanges(interactionState);
+      const section = document.querySelector<HTMLElement>("ytd-video-description-transcript-section-renderer");
+      if (section && elementIsVisible(section)) {
+        try { section.click(); } catch { /* Ignore. */ }
+        if (await waitForTranscriptPanelReady()) {
+          markTranscriptUiChanges(interactionState);
+          return true;
+        }
+      }
+    }
+
+    const moreButton = document.querySelector<HTMLElement>(
+      "ytd-watch-metadata #actions ytd-menu-renderer button[aria-label*='More actions'], " +
+      "#above-the-fold #actions ytd-menu-renderer button[aria-label*='More actions'], " +
+      "ytd-watch-metadata #actions ytd-menu-renderer button[aria-label*='작업 더보기'], " +
+      "#above-the-fold #actions ytd-menu-renderer button[aria-label*='작업 더보기']"
+    );
+    if (moreButton && elementIsVisible(moreButton)) {
+      try { moreButton.click(); } catch { /* Ignore. */ }
+      await sleep(350);
+      const menuItems = [...document.querySelectorAll("ytd-menu-service-item-renderer, tp-yt-paper-item")];
+      const item = menuItems.find((element) => {
+        if (!elementIsVisible(element)) return false;
+        const html = String(element.outerHTML || "");
+        const text = normalizeVisibleText(element.textContent || element.getAttribute("aria-label") || "").toLowerCase();
+        return html.includes("getTranscriptEndpoint") || html.includes("searchable-transcript") ||
+          /^(?:show transcript|transcript|스크립트 표시|대본 표시|文字起こし|字幕|transcripción|transcrição)$/.test(text);
+      });
+      if (item) {
+        try { (item as HTMLElement).click(); } catch { /* Ignore. */ }
+        if (await waitForTranscriptPanelReady()) {
+          markTranscriptUiChanges(interactionState);
+          return true;
+        }
+      } else {
+        try { moreButton.click(); } catch { /* Close the menu best-effort. */ }
+      }
+    }
+
+    markTranscriptUiChanges(interactionState);
+    return transcriptPanelIsReady();
+  }
+
+  async function fetchTranscriptViaPanel(
+    candidate: Candidate,
+    info: CaptionInfo,
+    rawTrack: RawTrack,
+    translationLanguageCode: string,
+    interactionState: InteractionState
+  ) {
+    const player = interactionState?.player || candidate?.player || findPlayerForVideoId(info.videoId);
+    const capture = createActualYouTubeRequestCapture(info, rawTrack, translationLanguageCode);
+    const attemptedUrls = new Set<string>();
+
+    try {
+      applyCaptionTrack(player, rawTrack, translationLanguageCode, interactionState);
+      await openTranscriptPanel(interactionState);
+
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < PANEL_REQUEST_TIMEOUT_MS) {
+        collectPlayerCaptionUrls(player, candidate, capture);
+
+        const captured = await capture.getParsedResult();
+        if (captured?.entries?.length) return { ...captured, format: "youtube-panel-issued-response" };
+
+        const fetched = await fetchCapturedUrls(capture, rawTrack, translationLanguageCode, attemptedUrls);
+        if (fetched?.entries?.length) return { ...fetched, format: "youtube-panel-issued-timedtext" };
+
+        const domEntries = await scrollTranscriptPanelsAndCollect(interactionState);
+        if (domEntries.length > 0) {
+          const currentTrack = safePlayerOption(player, "captions", "track");
+          const currentTranslation = normalizeLanguageCode(
+            (typeof currentTrack?.translationLanguage === "object" ? currentTrack.translationLanguage.languageCode : "") ||
+            currentTrack?.translationLanguageCode ||
+            currentTrack?.translationLanguage ||
+            ""
+          );
+          if (!translationLanguageCode || currentTranslation.toLowerCase() === translationLanguageCode.toLowerCase()) {
+            return { entries: domEntries, format: "youtube-transcript-panel" };
+          }
+        }
+        await sleep(350);
+      }
+      return null;
+    } finally {
+      capture.cleanup();
+    }
+  }
+
+  async function fetchTranscriptWithFallbacks(
+    candidate: Candidate,
+    info: CaptionInfo,
+    rawTrack: RawTrack,
+    translationLanguageCode: string,
+    interactionState: InteractionState
+  ) {
+    const baseUrl = String(rawTrack?.baseUrl || "").trim();
+
+    if (baseUrl && !requiresPlayerIssuedToken(baseUrl)) {
+      const direct = await fetchCaptionEntries(baseUrl, translationLanguageCode);
+      if (direct?.entries?.length) return direct;
+    }
+
+    const playerIssued = await fetchTranscriptViaPlayerRequest(
+      candidate, info, rawTrack, translationLanguageCode, interactionState
+    );
+    if (playerIssued?.entries?.length) return playerIssued;
+
+    const panel = await fetchTranscriptViaPanel(
+      candidate, info, rawTrack, translationLanguageCode, interactionState
+    );
+    if (panel?.entries?.length) return panel;
+
+    throw new Error(
+      "유튜브가 실제로 발급한 자막 요청에서도 자막 본문을 받지 못했습니다. 영상의 자막을 한 번 켠 뒤 목록을 새로고침하고 다시 시도하세요."
+    );
+  }
+
+  async function runTask() {
+  checkTask();
+  if (!isYoutubePage()) {
+    return { ok: false, error: "유튜브 영상 또는 Shorts 페이지에서 사용하세요." };
+  }
+
+  const operation = String(task.operation || "info");
+  if (operation === "synced-caption-remove") {
+    const removed = await removeSyncedCaptionManager({
+      restoreCaptionButton: true,
+      restoreNativeTrackModes: true
+    });
+    return { ok: true, syncedCaption: { active: false }, removed: removed.removed === true };
+  }
+  if (operation === "synced-caption-status") {
+    return { ok: true, syncedCaption: await readSyncedCaptionStatus() };
+  }
+
+  const candidate = choosePlayerResponse();
+  if (!candidate) {
+    return { ok: false, error: "현재 유튜브 플레이어 정보를 찾지 못했습니다. 페이지를 새로 고친 뒤 다시 시도하세요." };
+  }
+
+  const info = buildCaptionInfo(candidate);
+  if (!info.videoId) {
+    return { ok: false, error: "현재 영상의 식별 정보를 확인하지 못했습니다." };
+  }
+
+  if (info.tracks.length === 0) {
+    return {
+      ok: false,
+      error: "이 영상에서 사용할 수 있는 자막을 찾지 못했습니다. 유튜브 자막이 제공되는 영상인지 확인하세요.",
+      videoId: info.videoId,
+      title: info.title
+    };
+  }
+
+  const requiresTranscript = operation === "transcript" || operation === "synced-caption-apply";
+  if (requiresTranscript) {
+    const expectedVideoId = String(task.expectedVideoId || "").trim();
+    if (expectedVideoId && expectedVideoId !== info.videoId) {
+      return { ok: false, error: "영상이 변경되었습니다. 자막 목록을 새로고침한 뒤 다시 시도하세요." };
+    }
+  }
+
+  if (!requiresTranscript) {
+    return {
+      ok: true,
+      videoId: info.videoId,
+      title: info.title,
+      pageUrl: info.pageUrl,
+      tracks: info.tracks,
+      translationLanguages: info.translationLanguages,
+      syncedCaption: await readSyncedCaptionStatus()
+    };
+  }
+
+  const requestedIndex = Number(task.trackIndex);
+  const requestedTrackId = String(task.trackId || "");
+  let trackIndex = Number.isInteger(requestedIndex) ? requestedIndex : -1;
+  if (
+    trackIndex < 0 ||
+    trackIndex >= info.rawTracks.length ||
+    (requestedTrackId && String(info.rawTracks[trackIndex]?.vssId || `${info.rawTracks[trackIndex]?.languageCode || "und"}:${trackIndex}`) !== requestedTrackId)
+  ) {
+    trackIndex = info.rawTracks.findIndex((track, index) => (
+      String(track?.vssId || `${track?.languageCode || "und"}:${index}`) === requestedTrackId
+    ));
+  }
+
+  if (trackIndex < 0 || trackIndex >= info.rawTracks.length) {
+    return { ok: false, error: "선택한 자막 트랙을 현재 영상에서 다시 찾지 못했습니다." };
+  }
+
+  const rawTrack = info.rawTracks[trackIndex];
+  const publicTrack = info.tracks[trackIndex];
+  const translationLanguageCode = normalizeLanguageCode(task.translationLanguageCode);
+  if (translationLanguageCode && publicTrack?.isTranslatable === false) {
+    return { ok: false, error: "선택한 자막 트랙은 유튜브 자동 번역을 지원하지 않습니다." };
+  }
+
+  const translationLanguage = info.translationLanguages.find(
+    (language) => language.languageCode.toLowerCase() === translationLanguageCode.toLowerCase()
+  );
+  const interactionState = captureYouTubeInteractionState(candidate, info);
+  let fetched = null;
+  try {
+    fetched = await fetchTranscriptWithFallbacks(
+      candidate, info, rawTrack, translationLanguageCode, interactionState
+    );
+    const latestData = safeVideoData(interactionState.player);
+    const latestPlayerId = String(latestData?.video_id || latestData?.videoId || getResponseVideoId(safePlayerResponse(interactionState.player)) || "");
+    const latestUrlId = getUrlVideoId();
+    if ((latestPlayerId && latestPlayerId !== info.videoId) || (latestUrlId && latestUrlId !== info.videoId) ||
+        (interactionState.video && !interactionState.video.isConnected)) throw new Error("자막 추출 중 영상이 변경되었습니다. 결과를 사용하지 않습니다.");
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "자막 데이터를 읽지 못했습니다.",
+      videoId: info.videoId,
+      title: info.title
+    };
+  } finally {
+    restoringInteraction = true;
+    try { await restoreYouTubeInteractionState(interactionState); }
+    finally { restoringInteraction = false; interactionState.viewControl?.abort.abort(); }
+  }
+
+  checkTask();
+  if (operation === "synced-caption-apply") {
+    try {
+      const syncedCaption = await installSyncedCaptionTrack(
+        candidate,
+        info,
+        publicTrack,
+        translationLanguageCode,
+        translationLanguage?.name || translationLanguageCode,
+        fetched
+      );
+      return {
+        ok: true,
+        videoId: info.videoId,
+        title: info.title,
+        pageUrl: info.pageUrl,
+        sourceTrack: publicTrack,
+        translationLanguageCode,
+        translationLanguageName: translationLanguage?.name || translationLanguageCode,
+        format: fetched.format,
+        syncedCaption
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "동기화 자막을 적용하지 못했습니다.",
+        videoId: info.videoId,
+        title: info.title
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    videoId: info.videoId,
+    title: info.title,
+    pageUrl: info.pageUrl,
+    sourceTrack: publicTrack,
+    translationLanguageCode,
+    translationLanguageName: translationLanguage?.name || translationLanguageCode,
+    format: fetched.format,
+    entries: fetched.entries
+  };
+  }
+
+  try {
+    return await runTask();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "자막 작업을 중단했습니다." };
+  } finally {
+    taskFinished = true;
+    clearTimeout(taskTimer);
+    window.removeEventListener("pagehide", cancelOnNavigation);
+    document.removeEventListener("yt-navigate-start", cancelOnNavigation);
+    if (taskId && taskRegistry.get(taskId) === taskAbort) taskRegistry.delete(taskId);
+    if (taskRegistry.size === 0 && taskScope[taskRegistryKey] === taskRegistry) delete taskScope[taskRegistryKey];
+  }
+}
