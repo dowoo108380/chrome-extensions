@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script'; trusted-types 'none';">
+<title>YouTube quality integration fixture</title>
+<style>
+body { margin: 24px; background: #171e23; color: white; font: 16px Arial; }
+ytd-watch-flexy { display: block; }
+#movie_player { position: relative; width: 900px; height: 506px; background: black; }
+video { width: 100%; height: 100%; }
+.ytp-right-controls { position: absolute; right: 18px; bottom: 12px; }
+.ytp-settings-button { width: 48px; height: 40px; }
+.ytp-settings-menu { position: absolute; right: 16px; bottom: 58px; width: 300px; background: #252b32; max-height: 420px; overflow: auto; }
+.ytp-panel-header { padding: 12px; }
+.ytp-menuitem { padding: 8px 16px; display: flex; justify-content: space-between; cursor: pointer; }
+.ytp-menuitem[aria-checked=true] { color: #72dbc5; }
+[hidden] { display: none !important; }
+</style>
+<!-- Relevant native structure observed on 2026-09-29; no remote page code, API or stream. -->
+<ytd-watch-flexy video-id="quality_fixture">
+  <div id="movie_player" class="html5-video-player ytp-delhi-modern">
+    <video class="html5-main-video" muted preload="auto" src="/quality-fixture.webm"></video>
+    <div class="ytp-chrome-bottom"><div class="ytp-right-controls"><div class="ytp-right-controls-left">
+      <button class="ytp-button ytp-settings-button ytp-8k-quality-badge" aria-label="null"
+        aria-expanded="false" aria-haspopup="true" aria-controls="ytp-id-5"
+        data-tooltip-target-id="ytp-settings-button" data-tooltip-title="null">⚙</button>
+    </div></div></div>
+    <div id="ytp-id-5" class="ytp-popup ytp-settings-menu" data-layer="6" hidden></div>
+  </div>
+</ytd-watch-flexy>
+<button id="next-video">다음 영상</button>
+<script src="/quality-fixture.js"></script>
+<script src="/quality-fixture-setup.js"></script>
+</html>
