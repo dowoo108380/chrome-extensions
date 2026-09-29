@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>파일 포함 이미지 만들기</title>
+    <link rel="stylesheet" href="file_to_image.css">
+  </head>
+  <body>
+    <main class="tool-shell">
+      <header class="tool-header">
+        <div class="tool-header__identity">
+          <img src="icons/icon_48.png" width="42" height="42" alt="">
+          <div>
+            <p class="eyebrow">Browser Toolbox</p>
+            <h1>파일 포함 이미지 만들기</h1>
+            <p class="subtitle">표지 이미지 뒤에 ZIP 구조를 붙여, 이미지로도 열리고 압축 파일로도 읽을 수 있는 하나의 파일을 만듭니다.</p>
+          </div>
+        </div>
+        <button id="close-tool-button" class="ghost-button" type="button">이 탭 닫기</button>
+      </header>
+
+      <aside class="notice" aria-label="중요 안내">
+        <strong>암호화 기능이 아닙니다.</strong>
+        <span>결과 파일 안의 원본 파일은 ZIP 호환 압축 프로그램으로 쉽게 꺼낼 수 있습니다. 비밀번호, 인증서, 개인 문서처럼 보호가 필요한 자료를 숨기는 용도로 사용하지 마십시오.</span>
+      </aside>
+
+      <section class="workspace" aria-label="파일 포함 이미지 설정">
+        <article class="card cover-card">
+          <div class="card__header">
+            <div>
+              <span class="step">1</span>
+              <h2>표지 이미지</h2>
+              <p>결과 파일을 평소에 열었을 때 보일 이미지를 선택합니다.</p>
+            </div>
+            <button id="reset-cover-button" class="text-button" type="button">기본 표지</button>
+          </div>
+
+          <div id="cover-drop-zone" class="cover-drop-zone" tabindex="0" role="button" aria-label="표지 이미지 선택">
+            <img id="cover-preview" alt="선택한 표지 이미지 미리보기">
+            <div class="cover-drop-zone__overlay">
+              <strong>이미지를 놓거나 클릭하여 선택</strong>
+              <span>실제 JPEG, PNG 또는 GIF 파일</span>
+            </div>
+          </div>
+          <input id="cover-input" class="visually-hidden" type="file" accept=".jpg,.jpeg,.png,.gif,image/jpeg,image/png,image/gif">
+
+          <dl class="file-meta">
+            <div>
+              <dt>파일</dt>
+              <dd id="cover-name">불러오는 중</dd>
+            </div>
+            <div>
+              <dt>형식</dt>
+              <dd id="cover-format">확인 중</dd>
+            </div>
+            <div>
+              <dt>크기</dt>
+              <dd id="cover-size">-</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="card files-card">
+          <div class="card__header">
+            <div>
+              <span class="step">2</span>
+              <h2>이미지 안에 담을 파일</h2>
+              <p>여러 파일을 선택할 수 있습니다. 폴더는 먼저 ZIP 등으로 압축한 뒤 추가하십시오.</p>
+            </div>
+            <button id="clear-files-button" class="text-button text-button--danger" type="button" disabled>목록 비우기</button>
+          </div>
+
+          <div id="files-drop-zone" class="files-drop-zone" tabindex="0" role="button" aria-label="이미지 안에 담을 파일 선택">
+            <svg viewBox="0 0 24 24" width="36" height="36" aria-hidden="true">
+              <path d="M4 6.75A2.75 2.75 0 0 1 6.75 4h3.1c.73 0 1.43.29 1.95.8l.65.65c.14.14.33.22.53.22h4.27A2.75 2.75 0 0 1 20 8.42v8.83A2.75 2.75 0 0 1 17.25 20H6.75A2.75 2.75 0 0 1 4 17.25V6.75Zm2.75-.75a.75.75 0 0 0-.75.75v10.5c0 .41.34.75.75.75h10.5a.75.75 0 0 0 .75-.75V8.42a.75.75 0 0 0-.75-.75h-4.27c-.73 0-1.43-.29-1.95-.8l-.65-.65A.75.75 0 0 0 9.85 6h-3.1Zm4.25 3h2v2h2v2h-2v2h-2v-2H9v-2h2V9Z" fill="currentColor"/>
+            </svg>
+            <strong>파일을 여기에 끌어다 놓으십시오</strong>
+            <span>또는 클릭하여 탐색기에서 여러 파일을 선택하십시오.</span>
+          </div>
+          <input id="files-input" class="visually-hidden" type="file" multiple>
+
+          <div class="selection-summary">
+            <strong id="selected-files-count">0개 파일</strong>
+            <span id="selected-files-size">총 0바이트</span>
+          </div>
+
+          <div id="selected-files-list" class="selected-files-list" aria-live="polite">
+            <p class="empty-message">아직 선택한 파일이 없습니다.</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="card output-card" aria-labelledby="output-heading">
+        <div class="card__header">
+          <div>
+            <span class="step">3</span>
+            <h2 id="output-heading">결과 파일 만들기</h2>
+            <p>파일 이름에는 영문, 숫자와 밑줄만 사용할 수 있습니다. 실제 확장자는 표지 이미지 형식에 맞게 자동으로 정해집니다.</p>
+          </div>
+        </div>
+
+        <div class="output-controls">
+          <label class="name-field" for="output-name-input">
+            <span>파일 이름</span>
+            <input id="output-name-input" type="text" value="file_bundle" maxlength="64" spellcheck="false" autocomplete="off" inputmode="latin">
+          </label>
+          <button id="build-button" class="primary-button" type="button" disabled>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path d="M5.75 3A2.75 2.75 0 0 0 3 5.75v12.5A2.75 2.75 0 0 0 5.75 21h12.5A2.75 2.75 0 0 0 21 18.25V5.75A2.75 2.75 0 0 0 18.25 3H5.75ZM5 5.75c0-.41.34-.75.75-.75h12.5c.41 0 .75.34.75.75v8.08l-3.38-3.38a1.75 1.75 0 0 0-2.47 0l-1.5 1.5-1.6-1.6a1.75 1.75 0 0 0-2.47 0L5 12.93V5.75Zm0 10.01 3.99-3.99 1.6 1.6a1.5 1.5 0 0 0 2.12 0l1.68-1.68L19 16.3v1.95c0 .41-.34.75-.75.75H5.75a.75.75 0 0 1-.75-.75v-2.49ZM8.5 6.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" fill="currentColor"/>
+            </svg>
+            <span id="build-button-label">파일 포함 이미지 만들기</span>
+            <span class="button-spinner" aria-hidden="true"></span>
+          </button>
+        </div>
+
+        <div id="progress-panel" class="progress-panel" hidden>
+          <div class="progress-panel__copy">
+            <strong id="progress-title">파일을 확인하고 있습니다.</strong>
+            <span id="progress-detail"></span>
+          </div>
+          <progress id="build-progress" max="100" value="0">0%</progress>
+          <button id="cancel-build-button" class="secondary-button" type="button" hidden>만들기 취소</button>
+        </div>
+
+        <p id="status" class="status" data-state="ready" role="status" aria-live="polite">표지 이미지와 담을 파일을 준비하십시오.</p>
+      </section>
+
+      <section class="guide-grid" aria-label="사용 안내">
+        <article class="guide-card">
+          <h2>이미지로 보기</h2>
+          <p>생성된 파일은 표지 이미지와 같은 확장자로 저장됩니다. 일반 이미지 뷰어나 웹페이지에서 열면 선택한 표지만 표시됩니다.</p>
+        </article>
+        <article class="guide-card">
+          <h2>파일 꺼내기</h2>
+          <p>결과 파일의 복사본을 만든 뒤 확장자를 <code>.zip</code>으로 바꾸거나, 7-Zip 같은 ZIP 호환 프로그램에서 직접 열어 파일을 추출하십시오.</p>
+        </article>
+        <article class="guide-card">
+          <h2>크기와 처리 방식</h2>
+          <p>파일은 무압축 ZIP 구조로 담깁니다. 결과 크기는 표지 이미지와 원본 파일의 합계에 작은 ZIP 헤더가 더해진 정도이며, 생성 전에 각 파일의 CRC32를 실제로 계산합니다.</p>
+        </article>
+        <article class="guide-card">
+          <h2>개인정보</h2>
+          <p>모든 처리는 이 확장 프로그램 페이지 안에서 이루어집니다. 선택한 파일은 외부 서버로 전송하지 않습니다.</p>
+        </article>
+      </section>
+    </main>
+
+    <script src="dist/file_to_image_core.js"></script>
+    <script src="dist/file_to_image.js"></script>
+  </body>
+</html>

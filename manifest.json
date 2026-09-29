@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Ctrl+Enter, Screenshot, Tab URL & Page Tools",
-  "version": "1.29.0",
-  "description": "ChatGPT Ctrl+Enter and widths, per-source media speed, multi-tab YouTube transcripts, screenshots, tab URLs, and conservative page tools.",
+  "version": "2.0.0",
+  "description": "Browser toolbox for ChatGPT, media, YouTube captions, A/B looping and optional layout tools, screenshots and tabs.",
   "permissions": [
     "storage",
     "activeTab",
@@ -10,15 +10,15 @@
     "debugger",
     "downloads",
     "tabs",
-    "clipboardWrite",
-    "contextMenus"
+    "browsingData",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "http://*/*",
     "https://*/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "dist/background.js"
   },
   "icons": {
     "16": "icons/icon_16.png",
@@ -27,7 +27,7 @@
     "128": "icons/icon_128.png"
   },
   "action": {
-    "default_title": "ChatGPT 단축키와 너비, 유튜브 전체 자막, 미디어 재생 속도, 페이지 도구, 탭 URL 복사 및 웹페이지 제한 해제",
+    "default_title": "ChatGPT 단축키와 너비, 유튜브 자막 추출·배속 동기화·A/B 반복·레이아웃, 미디어 재생 속도, 화면 캡처, 파일 포함 이미지, 탭 페이지 활성 상태 유지, URL 복사, 사이트 데이터 삭제 및 웹페이지 도구",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon_16.png",
@@ -42,9 +42,27 @@
         "https://chatgpt.com/*"
       ],
       "js": [
-        "content_script.js"
+        "dist/content_script.js"
       ],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "*://youtube.com/*",
+        "*://*.youtube.com/*"
+      ],
+      "js": [
+        "dist/toolbox_shared.js",
+        "dist/youtube_synced_caption_overlay.js",
+        "dist/youtube_ab_loop.js",
+        "dist/youtube_layout.js",
+        "dist/youtube_quality.js"
+      ],
+      "run_at": "document_start",
+      "css": [
+        "youtube_layout.css",
+        "youtube_progress_theme.css"
+      ]
     },
     {
       "matches": [
@@ -53,7 +71,8 @@
         "file:///*"
       ],
       "js": [
-        "media_controller.js"
+        "dist/toolbox_shared.js",
+        "dist/media_controller.js"
       ],
       "all_frames": true,
       "match_about_blank": true,
@@ -66,7 +85,8 @@
         "https://*/*"
       ],
       "js": [
-        "element_eraser_restore.js"
+        "dist/toolbox_shared.js",
+        "dist/element_eraser_restore.js"
       ],
       "run_at": "document_start"
     },
@@ -76,12 +96,13 @@
         "https://*/*"
       ],
       "js": [
-        "right_click.js"
+        "dist/right_click.js"
       ],
       "all_frames": true,
       "match_about_blank": true,
       "match_origin_as_fallback": true,
       "run_at": "document_start"
     }
-  ]
+  ],
+  "minimum_chrome_version": "133"
 }

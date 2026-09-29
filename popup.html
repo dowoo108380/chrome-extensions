@@ -1,817 +1,626 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="ko">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ChatGPT 및 브라우저 도구</title>
-    <link rel="stylesheet" href="popup.css">
-  </head>
-  <body>
-    <main class="panel">
-      <header class="header">
-        <img class="header__icon" src="icons/icon_48.png" width="36" height="36" alt="">
-        <div>
-          <h1>ChatGPT 및 브라우저 도구</h1>
-          <p>ChatGPT 설정, 유튜브 전체 자막, HTML5 미디어 재생 속도, 페이지 도구, 탭 URL 복사와 웹페이지 제한 해제를 관리합니다.</p>
-        </div>
-      </header>
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Browser Toolbox</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<main class="panel"><header class="app-header"><div class="brand"><div class="brand-mark"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24" width="20"><path d="M5 7h14v14H5zM9 7V3h6v4M2 11h20M9 11v4h6v-4"></path></svg></div><div><h1>Browser Toolbox</h1><p>브라우저를 내 방식으로</p></div></div><div class="feature-search" role="search"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24" width="20"><path d="M21 21l-5-5M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16"></path></svg><input aria-controls="popup-search-results" aria-label="기능과 설정 검색" autocomplete="off" id="popup-search" placeholder="기능 찾기" spellcheck="false" type="search"/><kbd aria-hidden="true" class="search-hint">Ctrl K</kbd></div></header><div class="workspace"><aside class="sidebar"><div class="sidebar-caption">도구 모음</div><div aria-label="도구 분류" aria-orientation="vertical" class="section-nav" role="tablist"><button aria-controls="view-media" aria-selected="true" class="nav-item" data-section="media" id="nav-media" role="tab" tabindex="0" type="button"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24" width="20"><path d="M4 17a9 9 0 1 1 16 0M12 13l4-5M5 17h14"></path></svg><span>재생 속도</span></button><button aria-controls="view-youtube" aria-selected="false" class="nav-item" data-section="youtube" id="nav-youtube" role="tab" tabindex="-1" type="button"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24" width="20"><path d="M9 8l7 4-7 4V8zM4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path></svg><span>YouTube</span></button><button aria-controls="view-captions" aria-selected="false" class="nav-item" data-section="captions" id="nav-captions" role="tab" tabindex="-1" type="button"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24" width="20"><path d="M4 4h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-5l-3 3-3-3H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM6 9h4M14 9h4M6 13h12"></path></svg><span>자막</span></button><button aria-controls="view-tabs" aria-selected="false" class="nav-item" data-section="tabs" id="nav-tabs" role="tab" tabindex="-1" type="button"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24" width="20"><path d="M7 7V4a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-3M4 7h11a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"></path></svg><span>탭 관리</span></button><button aria-controls="view-page" aria-selected="false" class="nav-item" data-section="page" id="nav-page" role="tab" tabindex="-1" type="button"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24" width="20"><path d="M8 3H4a1 1 0 0 0-1 1v4M16 3h4a1 1 0 0 1 1 1v4M21 16v4a1 1 0 0 1-1 1h-4M8 21H4a1 1 0 0 1-1-1v-4M7 8h10v8H7z"></path></svg><span>페이지 도구</span></button><button aria-controls="view-chat" aria-selected="false" class="nav-item" data-section="chat" id="nav-chat" role="tab" tabindex="-1" type="button"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24" width="20"><path d="M5 3h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-8l-6 4v-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM7 8h10M7 12h6"></path></svg><span>ChatGPT</span></button><button aria-controls="view-settings" aria-selected="false" class="nav-item" data-section="settings" id="nav-settings" role="tab" tabindex="-1" type="button"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" viewbox="0 0 24 24" width="20"><path d="M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6"></path></svg><span>설정과 진단</span></button></div><div class="sidebar-footer"><span>Browser Toolbox</span><span id="popup-version">버전 확인 중</span></div></aside><div class="workspace-content"><section aria-labelledby="nav-media" class="workspace-panel" data-entry-toggle="media-toggle" data-section="media" id="view-media" role="tabpanel" tabindex="0"><div class="view-heading"><h2>미디어</h2><p>영상과 오디오를 원하는 속도로 재생하세요.</p></div><section aria-labelledby="media-heading" class="media-card">
+<button aria-controls="media-dropdown" aria-expanded="false" class="media-toggle" id="media-toggle" type="button">
+<svg aria-hidden="true" class="media-toggle__icon" height="20" viewbox="0 0 24 24" width="20">
+<path d="M5 4.75A2.75 2.75 0 0 1 7.75 2h8.5A2.75 2.75 0 0 1 19 4.75v14.5A2.75 2.75 0 0 1 16.25 22h-8.5A2.75 2.75 0 0 1 5 19.25V4.75Zm2 0v14.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75V4.75a.75.75 0 0 0-.75-.75h-8.5a.75.75 0 0 0-.75.75Zm3.15 3.18a.75.75 0 0 1 .79.04l4.25 2.75a.75.75 0 0 1 0 1.26l-4.25 2.75A.75.75 0 0 1 9.78 14.1V8.6a.75.75 0 0 1 .37-.67Zm1.13 2.05v2.74l2.12-1.37-2.12-1.37Z" fill="currentColor"></path>
+</svg>
+<span class="media-toggle__copy">
+<strong id="media-heading">현재 탭의 재생 속도</strong>
+<span id="media-summary">미디어 속도 조절이 꺼져 있습니다.</span>
+</span>
+<svg aria-hidden="true" class="media-toggle__chevron" height="18" viewbox="0 0 20 20" width="18">
+<path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+</button>
+<div class="media-dropdown" hidden="" id="media-dropdown">
+<div class="setting-row setting-row--compact media-master-row">
+<div class="setting-copy">
+<h2>미디어 속도 조절 사용</h2>
+<p>동영상과 오디오의 속도를 단축키와 패널에서 조절합니다.</p>
+</div>
+<label class="switch" for="media-controller-toggle">
+<input aria-label="HTML5 동영상과 오디오 재생 속도 조절" disabled="" id="media-controller-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div>
+<div class="media-controls">
+<div class="media-rate-heading">
+<label for="media-rate-input">현재 선택된 미디어 재생 속도</label>
+<button class="text-button" disabled="" id="media-rate-reset" type="button">1.00배속으로 초기화</button>
+</div>
+<div class="media-rate-row">
+<input aria-label="미디어 재생 속도 조절" aria-valuetext="1.00배속" class="media-rate-slider" disabled="" id="media-rate-slider" max="1600" min="7" step="1" type="range" value="100"/>
+<div class="media-number-wrap">
+<input aria-label="미디어 재생 속도 수치" class="media-number-input media-number-input--rate" disabled="" id="media-rate-input" inputmode="decimal" max="16" min="0.07" step="0.01" type="number" value="1.00"/>
+<span aria-hidden="true">배속</span>
+</div>
+</div>
+<div aria-hidden="true" class="media-rate-scale">
+<span>0.07배속</span>
+<span>16배속</span>
+</div>
+<details class="subsection" id="media-behavior-settings"><summary>배속과 탐색 간격</summary><div class="subsection-body"><div class="media-number-grid">
+<label class="media-number-setting" for="media-speed-step-input">
+<span>속도 변경 간격</span>
+<span class="media-number-wrap">
+<input class="media-number-input" disabled="" id="media-speed-step-input" inputmode="decimal" max="2" min="0.01" step="0.01" type="number" value="0.10"/>
+<span aria-hidden="true">배</span>
+</span>
+</label>
+<label class="media-number-setting" for="media-seek-step-input">
+<span>앞뒤 이동 간격</span>
+<span class="media-number-wrap">
+<input class="media-number-input" disabled="" id="media-seek-step-input" inputmode="numeric" max="600" min="1" step="1" type="number" value="10"/>
+<span aria-hidden="true">초</span>
+</span>
+</label>
+<label class="media-number-setting media-number-setting--wide" for="media-reset-fallback-rate-input">
+<span class="media-number-setting__copy">
+<strong>R 키 기본 복원 배속</strong>
+<small>이전 배속 기록이 없는 미디어에서 사용합니다.</small>
+</span>
+<span class="media-number-wrap">
+<input aria-label="R 키의 기본 복원 배속" class="media-number-input" disabled="" id="media-reset-fallback-rate-input" inputmode="decimal" max="16" min="0.07" step="0.01" type="number" value="2.00"/>
+<span aria-hidden="true">배속</span>
+</span>
+</label>
+</div><div class="setting-row setting-row--compact media-option-row">
+<div class="setting-copy">
+<h2>새 미디어 소스에 마지막 속도 유지</h2>
+<p>끄면 새로 불러온 동영상과 오디오는 1.00배속으로 시작합니다.</p>
+</div>
+<label class="switch" for="media-keep-rate-toggle">
+<input aria-label="새 동영상과 오디오에 마지막 재생 속도 유지" disabled="" id="media-keep-rate-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div><p class="media-note">현재 재생 중이거나 마지막으로 마우스를 올린 미디어 소스 하나만 조절합니다. 같은 탭의 다른 미디어와 다른 탭에는 영향을 주지 않습니다.</p></div></details><details class="subsection" id="media-display-settings"><summary>영상 위 표시창</summary><div class="subsection-body"><div class="setting-row setting-row--compact media-option-row">
+<div class="setting-copy">
+<h2>영상 위에 현재 속도 표시</h2>
+<p>영상 가운데 위의 표시창을 드래그하여 위치를 옮길 수 있습니다.</p>
+</div>
+<label class="switch" for="media-overlay-toggle">
+<input aria-label="영상 위에 현재 재생 속도 표시" disabled="" id="media-overlay-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div><div class="media-overlay-reset-row">
+<button class="text-button" disabled="" id="media-overlay-position-reset" type="button">표시창을 가운데 위로 되돌리기</button>
+</div></div></details><details class="subsection" id="media-keyboard-settings"><summary>미디어와 A/B 반복 단축키</summary><div class="subsection-body"><div class="setting-row setting-row--compact media-option-row">
+<div class="setting-copy">
+<h2>키보드 단축키 사용</h2>
+<p>입력란에 글을 쓰는 동안에는 단축키가 작동하지 않습니다.</p>
+</div>
+<label class="switch" for="media-keyboard-toggle">
+<input aria-label="미디어 속도와 재생 위치 키보드 단축키 사용" disabled="" id="media-keyboard-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div><div aria-labelledby="media-shortcut-heading" class="media-shortcut-editor">
+<div class="media-shortcut-editor__heading">
+<div>
+<h3 id="media-shortcut-heading">단축키 설정</h3>
+<p>각 키 버튼을 누른 뒤 사용할 키를 입력합니다.</p>
+</div>
+<button class="text-button" disabled="" id="media-shortcut-reset" type="button">기본값 복원</button>
+</div>
+<div class="media-shortcut-grid">
+<div class="media-shortcut-row">
+<span>느리게</span>
+<button class="media-shortcut-key" data-media-shortcut-command="slower" disabled="" type="button">S</button>
+</div>
+<div class="media-shortcut-row">
+<span>빠르게</span>
+<button class="media-shortcut-key" data-media-shortcut-command="faster" disabled="" type="button">D</button>
+</div>
+<div class="media-shortcut-row">
+<span>1.00배속 ↔ 이전/기본 배속</span>
+<button class="media-shortcut-key" data-media-shortcut-command="reset" disabled="" type="button">R</button>
+</div>
+<div class="media-shortcut-row">
+<span>뒤로 이동</span>
+<button class="media-shortcut-key" data-media-shortcut-command="backward" disabled="" type="button">Z</button>
+</div>
+<div class="media-shortcut-row">
+<span>앞으로 이동</span>
+<button class="media-shortcut-key" data-media-shortcut-command="forward" disabled="" type="button">X</button>
+</div>
+<div class="media-shortcut-row">
+<span>표시창 켜기 또는 끄기</span>
+<button class="media-shortcut-key" data-media-shortcut-command="overlay" disabled="" type="button">V</button>
+</div>
+</div>
+<div class="setting-row setting-row--compact media-option-row">
+<div class="setting-copy"><h2>A/B 반복 단축키 사용</h2><p>끄면 반복 패널의 버튼만 사용합니다. 미디어 단축키와 중복되는 키는 실행하지 않습니다.</p></div>
+<label class="switch" for="youtube-ab-keyboard-toggle"><input aria-label="A/B 반복 단축키 사용" id="youtube-ab-keyboard-toggle" type="checkbox"/><span class="switch__track"><span class="switch__thumb"></span></span></label>
+</div>
+<div class="media-shortcut-grid">
+<div class="media-shortcut-row"><span>반복 A 지점 설정</span><button class="media-shortcut-key" data-media-shortcut-command="loopA" type="button">A</button></div>
+<div class="media-shortcut-row"><span>반복 B 지점 설정</span><button class="media-shortcut-key" data-media-shortcut-command="loopB" type="button">B</button></div>
+</div>
+<p aria-live="polite" class="media-shortcut-hint" id="media-shortcut-hint">키 버튼을 누른 뒤 새 단축키를 입력합니다. Esc 키를 누르면 변경을 취소합니다.</p>
+</div><p class="media-note">로컬 파일은 Chrome의 확장 프로그램 세부정보에서 <strong>파일 URL에 대한 액세스 허용</strong>을 켜야 적용됩니다.</p></div></details></div>
+</div>
+</section></section><section aria-labelledby="nav-youtube" class="workspace-panel" data-section="youtube" hidden="" id="view-youtube" role="tabpanel" tabindex="0"><div class="view-heading"><h2>화면과 플레이어</h2><p>시청 페이지의 배치와 플레이어 메뉴를 구성하세요.</p></div><details class="youtube-tools-card quality-card" id="youtube-quality-card" open>
+<summary><span>선호 화질 자동 선택</span></summary>
+<div class="youtube-tools-row"><div class="youtube-tools-copy"><label for="youtube-quality-auto">영상마다 선호 화질 선택</label><p>실제 YouTube 화질 목록에서 선택합니다. 직접 바꾼 영상에는 다시 적용하지 않습니다.</p></div><label class="switch" aria-label="선호 화질 자동 선택"><input type="checkbox" id="youtube-quality-auto" disabled><span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span></label></div>
+<div class="quality-preference-row"><label for="youtube-quality-height">선호 해상도</label><select id="youtube-quality-height" disabled aria-describedby="youtube-quality-policy"></select></div>
+<p class="quality-help" id="youtube-quality-policy">선호 해상도 이하에서 가장 높은 화질을 선택합니다. 그 이하가 없으면 제공된 최저 화질을 선택합니다.</p>
+<div class="youtube-tools-row"><div class="youtube-tools-copy"><label for="youtube-quality-premium">같은 해상도에서 Premium 우선</label><p>선택 가능 상태가 확인된 항목만 우선합니다. 가입·구매 또는 이용 가능 여부가 불명확한 항목은 건너뜁니다.</p></div><label class="switch" aria-label="Premium 화질 우선"><input type="checkbox" id="youtube-quality-premium" disabled><span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span></label></div>
+<p class="quality-help">설정은 다른 탭에도 공유됩니다. 숨겨진 탭은 표시될 때 적용하며, 화질을 고르는 동안 YouTube 설정 메뉴가 잠깐 열릴 수 있습니다.</p>
+<details class="subsection" id="youtube-quality-details"><summary>현재 영상의 적용 상태</summary><div class="subsection-body"><div class="quality-actions"><button type="button" id="youtube-quality-inspect" class="settings-tools-button">현재 상태 확인</button><button type="button" id="youtube-quality-reapply" class="settings-tools-button" disabled>이 영상의 자동 선택 다시 시작</button></div><p class="quality-help">다시 시작하면 이 영상의 수동 선택 중단 상태를 해제합니다. 메뉴 선택과 실제 디코딩 해상도는 따로 표시하며 Premium 비트레이트는 측정하지 않습니다.</p></div></details>
+<p class="youtube-tools-status" id="youtube-quality-status" role="status" aria-live="polite">화질 설정을 읽는 중입니다.</p>
+</details>
+<details class="youtube-tools-card" id="youtube-tools-card">
+<summary><span>화면 구성과 플레이어 메뉴</span></summary>
+<p class="youtube-tools-intro">필요한 기능만 켜세요. 변경한 설정은 열려 있는 YouTube 페이지에 반영됩니다.</p>
+<div id="youtube-tools-options"></div>
+<p aria-live="polite" class="youtube-tools-status" id="youtube-tools-status" role="status">설정을 읽는 중입니다.</p>
+<details class="subsection" id="youtube-layout-diagnostics"><summary>레이아웃 진단과 지원 범위</summary><div class="subsection-body"><button class="settings-tools-button" id="youtube-tools-inspect" type="button">현재 탭의 레이아웃 상태 확인</button><button class="settings-tools-button" id="youtube-tools-copy-layout" type="button">레이아웃 진단 복사</button><textarea aria-label="레이아웃 크기 진단 정보" class="youtube-layout-json" hidden="" id="youtube-tools-layout-json" readonly="" rows="6"></textarea><p class="youtube-tools-unavailable"><strong>자동 미니플레이어 · 보류</strong><br/>시청 페이지를 떠날 때 자동 전환하는 안전한 공개 경로를 확인하지 못했습니다. YouTube 내부 탐색 함수나 재생목록 값을 바꾸지 않습니다.</p></div></details></details></section><section aria-labelledby="nav-captions" class="workspace-panel" data-entry-toggle="youtube-transcript-toggle" data-section="captions" hidden="" id="view-captions" role="tabpanel" tabindex="0"><div class="view-heading"><h2>YouTube 자막</h2><p>영상의 시간에 맞춘 자막과 텍스트 추출을 한곳에서 관리하세요.</p></div><section aria-labelledby="youtube-transcript-heading" class="youtube-transcript-card">
+<button aria-controls="youtube-transcript-dropdown" aria-expanded="false" class="youtube-transcript-toggle" id="youtube-transcript-toggle" type="button">
+<svg aria-hidden="true" class="youtube-transcript-toggle__icon" height="20" viewbox="0 0 24 24" width="20">
+<path d="M21.2 7.2a3 3 0 0 0-2.1-2.1C17.25 4.6 12 4.6 12 4.6s-5.25 0-7.1.5A3 3 0 0 0 2.8 7.2 31.6 31.6 0 0 0 2.3 12c0 1.6.17 3.2.5 4.8a3 3 0 0 0 2.1 2.1c1.85.5 7.1.5 7.1.5s5.25 0 7.1-.5a3 3 0 0 0 2.1-2.1c.33-1.6.5-3.2.5-4.8s-.17-3.2-.5-4.8ZM10 15.4V8.6l5.9 3.4-5.9 3.4Z" fill="currentColor"></path>
+</svg>
+<span class="youtube-transcript-toggle__copy">
+<strong id="youtube-transcript-heading">영상 탭 선택</strong>
+<span id="youtube-transcript-summary">영상 탭을 선택하고 자막을 적용하거나 저장합니다.</span>
+</span>
+<svg aria-hidden="true" class="youtube-transcript-toggle__chevron" height="18" viewbox="0 0 20 20" width="18">
+<path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+</button>
+<div class="youtube-transcript-dropdown" hidden="" id="youtube-transcript-dropdown">
+<div class="youtube-transcript-toolbar">
+<span id="youtube-transcript-list-summary">현재 창의 유튜브 영상 탭을 확인합니다.</span>
+<button class="text-button" id="youtube-transcript-refresh" type="button">새로고침</button>
+</div>
+<div class="youtube-transcript-selection-toolbar">
+<div class="youtube-transcript-selection-actions">
+<button class="text-button" id="youtube-transcript-select-all" type="button">모두 선택</button>
+<button class="text-button" id="youtube-transcript-clear" type="button">선택 해제</button>
+</div>
+<span id="youtube-transcript-selected-count">0개 선택</span>
+</div>
+<div aria-label="자막을 처리할 유튜브 탭 선택" class="youtube-transcript-tab-list" id="youtube-transcript-tab-list" role="group"></div>
+<div class="youtube-transcript-controls">
+<p class="youtube-transcript-note youtube-transcript-note--top">탭을 선택하면 해당 영상의 원본 자막과 자동 번역 언어를 개별적으로 설정할 수 있습니다.</p>
+<div class="youtube-synced-caption-panel">
+<div class="youtube-synced-caption-panel__copy">
+<strong>배속 동기화 자막</strong>
 
-      <section class="settings" aria-label="Ctrl과 Enter 단축키 기능 설정">
-        <div class="setting-row">
-          <div class="setting-copy">
-            <h2>새 메시지 입력란</h2>
-            <p>화면 하단 입력란에서 메시지를 전송합니다.</p>
-          </div>
-          <label class="switch" for="composer-toggle">
-            <input
-              id="composer-toggle"
-              type="checkbox"
-              aria-label="새 메시지 입력란에서 Ctrl과 Enter로 전송"
-              disabled
-            >
-            <span class="switch__track" aria-hidden="true">
-              <span class="switch__thumb"></span>
-            </span>
-          </label>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-copy">
-            <h2>이전 메시지 편집란</h2>
-            <p>연필 모양 버튼으로 연 편집란에서 전송합니다.</p>
-          </div>
-          <label class="switch" for="message-edit-toggle">
-            <input
-              id="message-edit-toggle"
-              type="checkbox"
-              aria-label="이전 메시지 편집란에서 Ctrl과 Enter로 전송"
-              disabled
-            >
-            <span class="switch__track" aria-hidden="true">
-              <span class="switch__thumb"></span>
-            </span>
-          </label>
-        </div>
-      </section>
-
-      <div class="shortcut" aria-label="단축키 Ctrl 더하기 Enter">
-        <kbd>Ctrl</kbd>
-        <span aria-hidden="true">+</span>
-        <kbd>Enter</kbd>
-      </div>
-
-      <section class="chat-width-card" aria-labelledby="chat-width-heading">
-        <div class="chat-width-header">
-          <div class="chat-width-copy">
-            <h2 id="chat-width-heading">ChatGPT 너비</h2>
-            <p>대화 기록과 화면 하단 입력란의 너비를 각각 조절합니다.</p>
-          </div>
-        </div>
-
-        <div class="chat-width-setting">
-          <div class="chat-width-setting__header">
-            <strong>대화 기록 너비</strong>
-            <output id="chat-width-value" class="chat-width-value" for="chat-width-slider">960픽셀</output>
-          </div>
-          <div class="chat-width-control">
-            <input
-              id="chat-width-slider"
-              class="chat-width-slider"
-              type="range"
-              min="0"
-              max="35"
-              step="1"
-              value="9"
-              aria-label="ChatGPT 대화 기록 너비 조절"
-              aria-valuetext="960픽셀"
-              disabled
-            >
-            <div class="chat-width-scale" aria-hidden="true">
-              <span>기본 너비</span>
-              <span>2,000픽셀</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="chat-width-setting">
-          <div class="chat-width-setting__header">
-            <strong>새 메시지 입력란 너비</strong>
-            <output id="composer-width-value" class="chat-width-value" for="composer-width-slider">ChatGPT 기본 너비</output>
-          </div>
-          <div class="chat-width-control">
-            <input
-              id="composer-width-slider"
-              class="chat-width-slider"
-              type="range"
-              min="0"
-              max="35"
-              step="1"
-              value="0"
-              aria-label="ChatGPT 새 메시지 입력란 너비 조절"
-              aria-valuetext="ChatGPT 기본 너비"
-              disabled
-            >
-            <div class="chat-width-scale" aria-hidden="true">
-              <span>기본 너비</span>
-              <span>2,000픽셀</span>
-            </div>
-          </div>
-        </div>
-
-        <p class="chat-width-note">각 슬라이더의 왼쪽 끝은 ChatGPT의 기본 너비이며, 변경 내용은 열려 있는 ChatGPT 탭에 즉시 적용됩니다.</p>
-      </section>
-
-      <section class="media-card" aria-labelledby="media-heading">
-        <button
-          id="media-toggle"
-          class="media-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-controls="media-dropdown"
-        >
-          <svg class="media-toggle__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-            <path d="M5 4.75A2.75 2.75 0 0 1 7.75 2h8.5A2.75 2.75 0 0 1 19 4.75v14.5A2.75 2.75 0 0 1 16.25 22h-8.5A2.75 2.75 0 0 1 5 19.25V4.75Zm2 0v14.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75V4.75a.75.75 0 0 0-.75-.75h-8.5a.75.75 0 0 0-.75.75Zm3.15 3.18a.75.75 0 0 1 .79.04l4.25 2.75a.75.75 0 0 1 0 1.26l-4.25 2.75A.75.75 0 0 1 9.78 14.1V8.6a.75.75 0 0 1 .37-.67Zm1.13 2.05v2.74l2.12-1.37-2.12-1.37Z" fill="currentColor"/>
-          </svg>
-          <span class="media-toggle__copy">
-            <strong id="media-heading">동영상 및 오디오 재생 속도</strong>
-            <span id="media-summary">미디어 속도 조절이 꺼져 있습니다.</span>
-          </span>
-          <svg class="media-toggle__chevron" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-            <path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-
-        <div id="media-dropdown" class="media-dropdown" hidden>
-          <div class="setting-row setting-row--compact media-master-row">
-            <div class="setting-copy">
-              <h2>HTML5 미디어 속도 조절</h2>
-              <p>페이지의 표준 동영상과 오디오 요소에 설정한 재생 속도를 적용합니다.</p>
-            </div>
-            <label class="switch" for="media-controller-toggle">
-              <input
-                id="media-controller-toggle"
-                type="checkbox"
-                aria-label="HTML5 동영상과 오디오 재생 속도 조절"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="media-controls">
-            <div class="media-rate-heading">
-              <label for="media-rate-input">현재 선택된 미디어 재생 속도</label>
-              <button id="media-rate-reset" class="text-button" type="button" disabled>1.00배속으로 초기화</button>
-            </div>
-
-            <div class="media-rate-row">
-              <input
-                id="media-rate-slider"
-                class="media-rate-slider"
-                type="range"
-                min="7"
-                max="1600"
-                step="1"
-                value="100"
-                aria-label="미디어 재생 속도 조절"
-                aria-valuetext="1.00배속"
-                disabled
-              >
-              <div class="media-number-wrap">
-                <input
-                  id="media-rate-input"
-                  class="media-number-input media-number-input--rate"
-                  type="number"
-                  min="0.07"
-                  max="16"
-                  step="0.01"
-                  value="1.00"
-                  inputmode="decimal"
-                  aria-label="미디어 재생 속도 수치"
-                  disabled
-                >
-                <span aria-hidden="true">배속</span>
-              </div>
-            </div>
-            <div class="media-rate-scale" aria-hidden="true">
-              <span>0.07배속</span>
-              <span>16배속</span>
-            </div>
-            <p class="media-note">현재 재생 중이거나 마지막으로 마우스를 올린 미디어 소스 하나만 조절합니다. 같은 탭의 다른 미디어와 다른 탭에는 영향을 주지 않습니다.</p>
-
-            <div class="media-number-grid">
-              <label class="media-number-setting" for="media-speed-step-input">
-                <span>속도 변경 간격</span>
-                <span class="media-number-wrap">
-                  <input
-                    id="media-speed-step-input"
-                    class="media-number-input"
-                    type="number"
-                    min="0.01"
-                    max="2"
-                    step="0.01"
-                    value="0.10"
-                    inputmode="decimal"
-                    disabled
-                  >
-                  <span aria-hidden="true">배</span>
-                </span>
-              </label>
-
-              <label class="media-number-setting" for="media-seek-step-input">
-                <span>앞뒤 이동 간격</span>
-                <span class="media-number-wrap">
-                  <input
-                    id="media-seek-step-input"
-                    class="media-number-input"
-                    type="number"
-                    min="1"
-                    max="600"
-                    step="1"
-                    value="10"
-                    inputmode="numeric"
-                    disabled
-                  >
-                  <span aria-hidden="true">초</span>
-                </span>
-              </label>
-
-              <label class="media-number-setting media-number-setting--wide" for="media-reset-fallback-rate-input">
-                <span class="media-number-setting__copy">
-                  <strong>R 키 기본 복원 배속</strong>
-                  <small>이전 배속 기록이 없는 미디어에서 사용합니다.</small>
-                </span>
-                <span class="media-number-wrap">
-                  <input
-                    id="media-reset-fallback-rate-input"
-                    class="media-number-input"
-                    type="number"
-                    min="0.07"
-                    max="16"
-                    step="0.01"
-                    value="2.00"
-                    inputmode="decimal"
-                    aria-label="R 키의 기본 복원 배속"
-                    disabled
-                  >
-                  <span aria-hidden="true">배속</span>
-                </span>
-              </label>
-            </div>
-
-            <div class="setting-row setting-row--compact media-option-row">
-              <div class="setting-copy">
-                <h2>새 미디어 소스에 마지막 속도 유지</h2>
-                <p>끄면 새로 불러온 동영상과 오디오는 1.00배속으로 시작합니다.</p>
-              </div>
-              <label class="switch" for="media-keep-rate-toggle">
-                <input
-                  id="media-keep-rate-toggle"
-                  type="checkbox"
-                  aria-label="새 동영상과 오디오에 마지막 재생 속도 유지"
-                  disabled
-                >
-                <span class="switch__track" aria-hidden="true">
-                  <span class="switch__thumb"></span>
-                </span>
-              </label>
-            </div>
-
-            <div class="setting-row setting-row--compact media-option-row">
-              <div class="setting-copy">
-                <h2>영상 위에 현재 속도 표시</h2>
-                <p>영상 가운데 위의 표시창을 드래그하여 위치를 옮길 수 있습니다.</p>
-              </div>
-              <label class="switch" for="media-overlay-toggle">
-                <input
-                  id="media-overlay-toggle"
-                  type="checkbox"
-                  aria-label="영상 위에 현재 재생 속도 표시"
-                  disabled
-                >
-                <span class="switch__track" aria-hidden="true">
-                  <span class="switch__thumb"></span>
-                </span>
-              </label>
-            </div>
-
-            <div class="media-overlay-reset-row">
-              <button id="media-overlay-position-reset" class="text-button" type="button" disabled>표시창을 가운데 위로 되돌리기</button>
-            </div>
-
-            <div class="setting-row setting-row--compact media-option-row">
-              <div class="setting-copy">
-                <h2>키보드 단축키 사용</h2>
-                <p>입력란에 글을 쓰는 동안에는 단축키가 작동하지 않습니다.</p>
-              </div>
-              <label class="switch" for="media-keyboard-toggle">
-                <input
-                  id="media-keyboard-toggle"
-                  type="checkbox"
-                  aria-label="미디어 속도와 재생 위치 키보드 단축키 사용"
-                  disabled
-                >
-                <span class="switch__track" aria-hidden="true">
-                  <span class="switch__thumb"></span>
-                </span>
-              </label>
-            </div>
-
-            <div class="media-shortcut-editor" aria-labelledby="media-shortcut-heading">
-              <div class="media-shortcut-editor__heading">
-                <div>
-                  <h3 id="media-shortcut-heading">단축키 설정</h3>
-                  <p>각 키 버튼을 누른 뒤 사용할 키를 입력합니다.</p>
-                </div>
-                <button id="media-shortcut-reset" class="text-button" type="button" disabled>기본값 복원</button>
-              </div>
-
-              <div class="media-shortcut-grid">
-                <div class="media-shortcut-row">
-                  <span>느리게</span>
-                  <button class="media-shortcut-key" type="button" data-media-shortcut-command="slower" disabled>S</button>
-                </div>
-                <div class="media-shortcut-row">
-                  <span>빠르게</span>
-                  <button class="media-shortcut-key" type="button" data-media-shortcut-command="faster" disabled>D</button>
-                </div>
-                <div class="media-shortcut-row">
-                  <span>1.00배속 ↔ 이전/기본 배속</span>
-                  <button class="media-shortcut-key" type="button" data-media-shortcut-command="reset" disabled>R</button>
-                </div>
-                <div class="media-shortcut-row">
-                  <span>뒤로 이동</span>
-                  <button class="media-shortcut-key" type="button" data-media-shortcut-command="backward" disabled>Z</button>
-                </div>
-                <div class="media-shortcut-row">
-                  <span>앞으로 이동</span>
-                  <button class="media-shortcut-key" type="button" data-media-shortcut-command="forward" disabled>X</button>
-                </div>
-                <div class="media-shortcut-row">
-                  <span>표시창 켜기 또는 끄기</span>
-                  <button class="media-shortcut-key" type="button" data-media-shortcut-command="overlay" disabled>V</button>
-                </div>
-              </div>
-
-              <p id="media-shortcut-hint" class="media-shortcut-hint" aria-live="polite">키 버튼을 누른 뒤 새 단축키를 입력합니다. Esc 키를 누르면 변경을 취소합니다.</p>
-            </div>
-
-            <p class="media-note">로컬 파일은 Chrome의 확장 프로그램 세부정보에서 <strong>파일 URL에 대한 액세스 허용</strong>을 켜야 적용됩니다.</p>
-          </div>
-        </div>
-      </section>
-
-
-
-      <section class="youtube-transcript-card" aria-labelledby="youtube-transcript-heading">
-        <button
-          id="youtube-transcript-toggle"
-          class="youtube-transcript-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-controls="youtube-transcript-dropdown"
-        >
-          <svg class="youtube-transcript-toggle__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-            <path d="M21.2 7.2a3 3 0 0 0-2.1-2.1C17.25 4.6 12 4.6 12 4.6s-5.25 0-7.1.5A3 3 0 0 0 2.8 7.2 31.6 31.6 0 0 0 2.3 12c0 1.6.17 3.2.5 4.8a3 3 0 0 0 2.1 2.1c1.85.5 7.1.5 7.1.5s5.25 0 7.1-.5a3 3 0 0 0 2.1-2.1c.33-1.6.5-3.2.5-4.8s-.17-3.2-.5-4.8ZM10 15.4V8.6l5.9 3.4-5.9 3.4Z" fill="currentColor"/>
-          </svg>
-          <span class="youtube-transcript-toggle__copy">
-            <strong id="youtube-transcript-heading">유튜브 전체 자막</strong>
-            <span id="youtube-transcript-summary">현재 창의 영상과 Shorts 탭을 골라 자막을 한꺼번에 처리합니다.</span>
-          </span>
-          <svg class="youtube-transcript-toggle__chevron" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-            <path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-
-        <div id="youtube-transcript-dropdown" class="youtube-transcript-dropdown" hidden>
-          <div class="youtube-transcript-toolbar">
-            <span id="youtube-transcript-list-summary">현재 창의 유튜브 영상 탭을 확인합니다.</span>
-            <button id="youtube-transcript-refresh" class="text-button" type="button">새로고침</button>
-          </div>
-
-          <div class="youtube-transcript-selection-toolbar">
-            <div class="youtube-transcript-selection-actions">
-              <button id="youtube-transcript-select-all" class="text-button" type="button">모두 선택</button>
-              <button id="youtube-transcript-clear" class="text-button" type="button">선택 해제</button>
-            </div>
-            <span id="youtube-transcript-selected-count">0개 선택</span>
-          </div>
-
-          <div
-            id="youtube-transcript-tab-list"
-            class="youtube-transcript-tab-list"
-            role="group"
-            aria-label="자막을 추출할 유튜브 탭 선택"
-          ></div>
-
-          <div class="youtube-transcript-controls">
-            <p class="youtube-transcript-note youtube-transcript-note--top">탭을 선택하면 해당 영상의 원본 자막과 자동 번역 언어를 개별적으로 설정할 수 있습니다.</p>
-
-            <div class="youtube-transcript-options">
-              <label class="youtube-transcript-check" for="youtube-transcript-title-toggle">
-                <input id="youtube-transcript-title-toggle" type="checkbox" checked disabled>
-                <span>영상 제목 포함</span>
-              </label>
-              <label class="youtube-transcript-check" for="youtube-transcript-time-toggle">
-                <input id="youtube-transcript-time-toggle" type="checkbox" disabled>
-                <span>재생 시간 포함</span>
-              </label>
-            </div>
-
-            <label class="youtube-transcript-field youtube-transcript-field--inline" for="youtube-transcript-spacing">
-              <span>자막 줄 사이의 빈 줄</span>
-              <select id="youtube-transcript-spacing" disabled>
-                <option value="0">없음</option>
-                <option value="1">1개</option>
-                <option value="2">2개</option>
-                <option value="3">3개</option>
-              </select>
-            </label>
-
-            <p class="youtube-transcript-note">선택한 탭의 표시 순서대로 처리합니다. 자막을 제공하지 않거나 메모리에서 내려간 탭은 건너뛰고 결과에 오류를 표시합니다.</p>
-
-            <div class="youtube-transcript-actions youtube-transcript-actions--batch">
-              <button id="youtube-transcript-copy" class="youtube-transcript-button" type="button" disabled>
-                <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
-                  <path d="M8 8.75A2.75 2.75 0 0 1 10.75 6h7.5A2.75 2.75 0 0 1 21 8.75v7.5A2.75 2.75 0 0 1 18.25 19h-7.5A2.75 2.75 0 0 1 8 16.25v-7.5Zm2 0v7.5c0 .414.336.75.75.75h7.5a.75.75 0 0 0 .75-.75v-7.5a.75.75 0 0 0-.75-.75h-7.5a.75.75 0 0 0-.75.75ZM3 5.75A2.75 2.75 0 0 1 5.75 3h7.5A2.75 2.75 0 0 1 16 5.75V6h-2v-.25a.75.75 0 0 0-.75-.75h-7.5a.75.75 0 0 0-.75.75v7.5c0 .414.336.75.75.75H6v2h-.25A2.75 2.75 0 0 1 3 13.25v-7.5Z" fill="currentColor"/>
-                </svg>
-                <span id="youtube-transcript-copy-label">선택 자막 모두 복사</span>
-                <span class="youtube-transcript-spinner" aria-hidden="true"></span>
-              </button>
-              <button id="youtube-transcript-download" class="youtube-transcript-button youtube-transcript-button--secondary" type="button" disabled>
-                <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
-                  <path d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17V3Zm-6 16h14v2H5v-2Z" fill="currentColor"/>
-                </svg>
-                <span id="youtube-transcript-download-label">한 파일로 저장</span>
-                <span class="youtube-transcript-spinner" aria-hidden="true"></span>
-              </button>
-              <button id="youtube-transcript-download-separate" class="youtube-transcript-button youtube-transcript-button--tertiary" type="button" disabled>
-                <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
-                  <path d="M4 3h10a2 2 0 0 1 2 2v2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v10h2V9a2 2 0 0 1 2-2h6V5H4Zm4 4v10h10V9H8Zm4 1h2v4h2l-3 3-3-3h2v-4Z" fill="currentColor"/>
-                </svg>
-                <span id="youtube-transcript-download-separate-label">개별 파일 일괄 저장</span>
-                <span class="youtube-transcript-spinner" aria-hidden="true"></span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-
-      <section class="page-unlock-card" aria-labelledby="page-unlock-heading">
-        <button
-          id="page-unlock-toggle"
-          class="page-unlock-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-controls="page-unlock-dropdown"
-        >
-          <svg class="page-unlock-toggle__icon" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
-            <path d="M5.25 3.5a1 1 0 0 1 1.42-.91l12.2 5.93a1 1 0 0 1-.16 1.86l-5.08 1.55 2.65 5.02a1 1 0 0 1-.42 1.35l-2.2 1.16a1 1 0 0 1-1.35-.42l-2.64-5.01-3.03 4.34a1 1 0 0 1-1.82-.53L5.25 3.5Zm2.02 1.72-.3 9.53 2.02-2.9a1 1 0 0 1 1.7.1l3.02 5.73.43-.23-3.03-5.73a1 1 0 0 1 .59-1.42l3.4-1.04-7.83-4.04Z" fill="currentColor"/>
-          </svg>
-          <span class="page-unlock-toggle__copy">
-            <strong id="page-unlock-heading">웹페이지 입력 제한 해제</strong>
-            <span id="page-unlock-summary">10개 기능을 개별적으로 설정합니다.</span>
-          </span>
-          <svg class="page-unlock-toggle__chevron" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-            <path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-
-        <div id="page-unlock-dropdown" class="page-unlock-dropdown" hidden>
-          <div class="setting-row setting-row--compact page-unlock-master-row">
-            <div class="setting-copy">
-              <h2>열 가지 기능 한 번에 설정</h2>
-              <p>모두 켜거나 모두 끕니다. 일부만 켜져 있으면 중간 상태로 표시됩니다.</p>
-            </div>
-            <label class="switch switch--master" for="page-unlock-master-toggle">
-              <input
-                id="page-unlock-master-toggle"
-                type="checkbox"
-                aria-label="웹페이지 입력 제한 해제 기능 열 가지를 한 번에 켜거나 끄기"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="page-unlock-group-title">마우스, 선택 및 복사</div>
-
-          <div class="setting-row setting-row--compact">
-            <div class="setting-copy">
-              <h2>우클릭 메뉴 허용</h2>
-              <p>웹사이트가 막은 Chrome 기본 우클릭 메뉴를 사용합니다.</p>
-            </div>
-            <label class="switch" for="right-click-toggle">
-              <input
-                id="right-click-toggle"
-                type="checkbox"
-                aria-label="웹사이트가 차단한 우클릭 메뉴 허용"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="setting-row setting-row--compact">
-            <div class="setting-copy">
-              <h2>텍스트 드래그 및 선택 허용</h2>
-              <p>텍스트를 드래그하여 선택하고 복사할 수 있게 합니다.</p>
-            </div>
-            <label class="switch" for="text-selection-toggle">
-              <input
-                id="text-selection-toggle"
-                type="checkbox"
-                aria-label="웹사이트가 차단한 텍스트 드래그와 선택 허용"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="setting-row setting-row--compact">
-            <div class="setting-copy">
-              <h2>복사 차단 및 문구 변경 방지</h2>
-              <p>복사를 취소하거나 다른 문구로 바꾸는 사이트 동작을 막습니다.</p>
-            </div>
-            <label class="switch" for="copy-unlock-toggle">
-              <input
-                id="copy-unlock-toggle"
-                type="checkbox"
-                aria-label="웹사이트의 복사 취소와 복사 문구 변경 방지"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="setting-row setting-row--compact">
-            <div class="setting-copy">
-              <h2>클립보드 덧붙이기 방지</h2>
-              <p>선택한 텍스트만 복사하여 사이트 주소 등의 추가 문구를 막습니다.</p>
-            </div>
-            <label class="switch" for="clipboard-protection-toggle">
-              <input
-                id="clipboard-protection-toggle"
-                type="checkbox"
-                aria-label="클립보드에 사이트 주소와 추가 문구를 덧붙이는 동작 방지"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="setting-row setting-row--compact">
-            <div class="setting-copy">
-              <h2>이미지 드래그 허용</h2>
-              <p>웹사이트가 막은 이미지 끌어서 옮기기를 다시 사용합니다.</p>
-            </div>
-            <label class="switch" for="image-drag-toggle">
-              <input
-                id="image-drag-toggle"
-                type="checkbox"
-                aria-label="웹사이트가 차단한 이미지 드래그 허용"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="setting-row setting-row--compact">
-            <div class="setting-copy">
-              <h2>가운데 버튼과 휠 클릭 허용</h2>
-              <p>링크 새 탭 열기와 휠 클릭 자동 스크롤을 다시 사용합니다.</p>
-            </div>
-            <label class="switch" for="middle-click-toggle">
-              <input
-                id="middle-click-toggle"
-                type="checkbox"
-                aria-label="웹사이트가 차단한 마우스 가운데 버튼과 휠 클릭 허용"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="page-unlock-group-title">링크 및 방문 기록</div>
-
-          <div class="setting-row setting-row--compact">
-            <div class="setting-copy">
-              <h2>자바스크립트 링크 새 탭 열기</h2>
-              <p>일반 링크는 Chrome에 맡기고, 자바스크립트 버튼형 링크만 새 탭에서 엽니다.</p>
-            </div>
-            <label class="switch" for="new-tab-links-toggle">
-              <input
-                id="new-tab-links-toggle"
-                type="checkbox"
-                aria-label="자바스크립트 버튼으로 만든 링크를 새 탭에서 열기"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="setting-row setting-row--compact">
-            <div class="setting-copy">
-              <h2>뒤로 가기 방해 차단</h2>
-              <p>방문 기록을 반복 추가하거나 뒤로 이동 직후 다시 보내는 동작을 막습니다.</p>
-            </div>
-            <label class="switch" for="back-navigation-toggle">
-              <input
-                id="back-navigation-toggle"
-                type="checkbox"
-                aria-label="웹사이트의 뒤로 가기 방해 차단"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="setting-row setting-row--compact">
-            <div class="setting-copy">
-              <h2>링크 주소 복사</h2>
-              <p>우클릭 메뉴에서 Chrome이 확인한 일반 링크 주소나 명시적인 버튼형 링크 주소를 그대로 복사합니다.</p>
-            </div>
-            <label class="switch" for="link-address-copy-toggle">
-              <input
-                id="link-address-copy-toggle"
-                type="checkbox"
-                aria-label="일반 링크와 명시적인 버튼형 링크의 주소 복사"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="setting-row setting-row--compact">
-            <div class="setting-copy">
-              <h2>사이트 자체 외부 링크 경고 건너뛰기</h2>
-              <p>일반 페이지의 버튼은 누르지 않고, 외부 링크 확인 창과 명확한 경고 전용 화면만 건너뜁니다.</p>
-            </div>
-            <label class="switch" for="site-warning-bypass-toggle">
-              <input
-                id="site-warning-bypass-toggle"
-                type="checkbox"
-                aria-label="사이트 자체 외부 링크 확인 창과 중간 경고 화면 건너뛰기"
-                disabled
-              >
-              <span class="switch__track" aria-hidden="true">
-                <span class="switch__thumb"></span>
-              </span>
-            </label>
-          </div>
-        </div>
-      </section>
-
-      <section class="capture-card" aria-labelledby="capture-heading">
-        <div class="capture-copy">
-          <h2 id="capture-heading">페이지 도구</h2>
-          <p>화면을 캡처하거나 페이지 요소를 직접 클릭하여 숨깁니다.</p>
-        </div>
-
-        <div class="capture-actions">
-          <button id="full-page-button" class="capture-button" type="button">
-            <svg class="capture-button__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path d="M8.25 5.5 9.5 3.75h5L15.75 5.5H19a2.25 2.25 0 0 1 2.25 2.25v9A2.25 2.25 0 0 1 19 19H5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 5 5.5h3.25Zm3.75 2A4.25 4.25 0 1 0 12 16a4.25 4.25 0 0 0 0-8.5Zm0 1.5a2.75 2.75 0 1 1 0 5.5A2.75 2.75 0 0 1 12 9Z" fill="currentColor"/>
-            </svg>
-            <span id="full-page-button-label">현재 페이지 전체 캡처</span>
-            <span class="capture-button__spinner" aria-hidden="true"></span>
-          </button>
-
-          <button id="area-button" class="capture-button capture-button--secondary" type="button">
-            <svg class="capture-button__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path d="M4 9V5a1 1 0 0 1 1-1h4v2H6v3H4Zm11-5h4a1 1 0 0 1 1 1v4h-2V6h-3V4ZM6 15v3h3v2H5a1 1 0 0 1-1-1v-4h2Zm14 0v4a1 1 0 0 1-1 1h-4v-2h3v-3h2ZM8 8h8v8H8V8Zm2 2v4h4v-4h-4Z" fill="currentColor"/>
-            </svg>
-            <span id="area-button-label">드래그하여 영역 캡처</span>
-            <span class="capture-button__spinner" aria-hidden="true"></span>
-          </button>
-        </div>
-
-        <div class="capture-paths" aria-label="화면 캡처 저장 위치">
-          <p>전체: 다운로드\full_page_screenshots</p>
-          <p>영역: 다운로드\selected_area_screenshots</p>
-        </div>
-
-        <div class="page-tool-divider" aria-hidden="true"></div>
-
-        <div class="element-eraser-tool">
-          <button
-            id="element-eraser-toggle"
-            class="element-eraser-toggle"
-            type="button"
-            aria-expanded="false"
-            aria-controls="element-eraser-dropdown"
-          >
-            <svg class="element-eraser-toggle__icon" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
-              <path d="M5.25 3.5a1 1 0 0 1 1.42-.91l12.2 5.93a1 1 0 0 1-.16 1.86l-5.08 1.55 2.65 5.02a1 1 0 0 1-.42 1.35l-2.2 1.16a1 1 0 0 1-1.35-.42l-2.64-5.01-3.03 4.34a1 1 0 0 1-1.82-.53L5.25 3.5Zm2.02 1.72-.3 9.53 2.02-2.9a1 1 0 0 1 1.7.1l3.02 5.73.43-.23-3.03-5.73a1 1 0 0 1 .59-1.42l3.4-1.04-7.83-4.04Z" fill="currentColor"/>
-            </svg>
-            <span class="element-eraser-toggle__copy">
-              <strong id="element-eraser-heading">클릭하여 페이지 요소 숨기기</strong>
-              <span>숨기는 방식을 선택한 뒤 페이지에서 요소를 연속해서 클릭합니다.</span>
-            </span>
-            <svg class="element-eraser-toggle__chevron" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-              <path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-
-          <div id="element-eraser-dropdown" class="element-eraser-dropdown" hidden>
-            <div class="element-eraser-mode-list" role="group" aria-label="페이지 요소 숨기기 방식 선택">
-              <button class="element-eraser-mode" type="button" data-eraser-mode="temporary">
-                <span class="element-eraser-mode__title">이번 페이지에서만 숨기기</span>
-                <span class="element-eraser-mode__description">현재 페이지에서만 숨기며 새로 고치면 다시 나타납니다.</span>
-              </button>
-              <button class="element-eraser-mode element-eraser-mode--persistent" type="button" data-eraser-mode="persistent">
-                <span class="element-eraser-mode__title">이 사이트에 기억해서 숨기기</span>
-                <span class="element-eraser-mode__description">같은 사이트를 다시 방문해도 선택한 요소를 계속 숨깁니다.</span>
-              </button>
-            </div>
-
-            <div class="element-eraser-memory">
-              <span id="element-eraser-site-summary">현재 사이트의 기억된 요소를 확인합니다.</span>
-              <button id="clear-element-eraser-rules" class="text-button" type="button" disabled>모두 복원</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="tab-copy-card" aria-labelledby="tab-copy-heading">
-        <button
-          id="tab-url-toggle"
-          class="tab-copy-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-controls="tab-url-dropdown"
-        >
-          <svg class="tab-copy-toggle__icon" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">
-            <path d="M8.5 6.5h-2A3.5 3.5 0 0 0 3 10v7a3.5 3.5 0 0 0 3.5 3.5h7A3.5 3.5 0 0 0 17 17v-2h-2v2a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 5 17v-7a1.5 1.5 0 0 1 1.5-1.5h2v-2ZM10.5 3h7A3.5 3.5 0 0 1 21 6.5v7a3.5 3.5 0 0 1-3.5 3.5h-7A3.5 3.5 0 0 1 7 13.5v-7A3.5 3.5 0 0 1 10.5 3Zm0 2A1.5 1.5 0 0 0 9 6.5v7a1.5 1.5 0 0 0 1.5 1.5h7a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 17.5 5h-7Z" fill="currentColor"/>
-          </svg>
-          <span class="tab-copy-toggle__copy">
-            <strong id="tab-copy-heading">열린 탭 URL 복사</strong>
-            <span>원하는 탭을 골라 한 줄에 하나씩 복사합니다.</span>
-          </span>
-          <svg class="tab-copy-toggle__chevron" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-            <path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-
-        <div id="tab-url-dropdown" class="tab-url-dropdown" hidden>
-          <div class="tab-list-toolbar">
-            <span id="tab-list-summary">현재 창의 탭을 불러옵니다.</span>
-            <button id="refresh-tabs-button" class="text-button" type="button">새로고침</button>
-          </div>
-
-          <div
-            id="tab-list"
-            class="tab-list"
-            role="group"
-            aria-label="URL을 복사할 탭 선택"
-          ></div>
-
-          <div class="tab-selection-row">
-            <div class="tab-selection-actions">
-              <button id="select-all-tabs-button" class="text-button" type="button">모두 선택</button>
-              <button id="clear-tabs-button" class="text-button" type="button">선택 해제</button>
-            </div>
-            <span id="selected-tabs-count">0개 선택</span>
-          </div>
-
-          <button id="copy-tab-urls-button" class="copy-tab-urls-button" type="button" disabled>
-            <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
-              <path d="M8 8.75A2.75 2.75 0 0 1 10.75 6h7.5A2.75 2.75 0 0 1 21 8.75v7.5A2.75 2.75 0 0 1 18.25 19h-7.5A2.75 2.75 0 0 1 8 16.25v-7.5Zm2 0v7.5c0 .414.336.75.75.75h7.5a.75.75 0 0 0 .75-.75v-7.5a.75.75 0 0 0-.75-.75h-7.5a.75.75 0 0 0-.75.75ZM3 5.75A2.75 2.75 0 0 1 5.75 3h7.5A2.75 2.75 0 0 1 16 5.75V6h-2v-.25a.75.75 0 0 0-.75-.75h-7.5a.75.75 0 0 0-.75.75v7.5c0 .414.336.75.75.75H6v2h-.25A2.75 2.75 0 0 1 3 13.25v-7.5Z" fill="currentColor"/>
-            </svg>
-            <span id="copy-tab-urls-label">선택한 URL 복사</span>
-          </button>
-        </div>
-      </section>
-
-      <p id="status" class="status" role="status" aria-live="polite">
-        설정을 불러오는 중입니다.
-      </p>
-    </main>
-
-    <script src="popup.js"></script>
-    <script src="youtube_transcript_popup.js"></script>
-  </body>
+</div>
+<div class="youtube-transcript-actions youtube-transcript-actions--sync">
+<button class="youtube-transcript-button" disabled="" id="youtube-synced-caption-apply" type="button">
+<svg aria-hidden="true" height="17" viewbox="0 0 24 24" width="17">
+<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H13l-4.8 4v-4H6.5A2.5 2.5 0 0 1 4 13.5v-8Zm2.5-.5a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h3.7v1.73L12.27 14h5.23a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-11ZM7 7h4v2H7V7Zm6 0h4v2h-4V7Zm-6 4h6v2H7v-2Z" fill="currentColor"></path>
+</svg>
+<span id="youtube-synced-caption-apply-label">선택 탭에 적용</span>
+<span aria-hidden="true" class="youtube-transcript-spinner"></span>
+</button>
+<button class="youtube-transcript-button youtube-transcript-button--secondary" disabled="" id="youtube-synced-caption-remove" type="button">
+<svg aria-hidden="true" height="17" viewbox="0 0 24 24" width="17">
+<path d="M6.7 5.3 12 10.59l5.3-5.3 1.4 1.42L13.41 12l5.3 5.3-1.42 1.4L12 13.41l-5.3 5.3-1.4-1.42 5.29-5.3-5.3-5.3L6.7 5.3Z" fill="currentColor"></path>
+</svg>
+<span id="youtube-synced-caption-remove-label">선택 탭에서 해제</span>
+<span aria-hidden="true" class="youtube-transcript-spinner"></span>
+</button>
+</div>
+<details class="subsection" id="caption-appearance-settings"><summary>자막 모양과 위치</summary><div class="subsection-body"><p class="youtube-transcript-note">선택한 자막을 영상 재생 시간에 연결하여 표시합니다. 영상 위 자막을 마우스로 끌어 위치를 옮길 수 있으며, 적용 중 YouTube의 CC 버튼을 누르면 기본 자막으로 돌아갑니다.</p><div class="youtube-synced-caption-settings">
+<label class="youtube-synced-caption-setting" for="youtube-synced-caption-font-size">
+<span>자막 크기</span>
+<span class="youtube-synced-caption-setting__control">
+<input aria-label="배속 동기화 자막 글자 크기" disabled="" id="youtube-synced-caption-font-size" max="64" min="14" step="1" type="range" value="28"/>
+<output for="youtube-synced-caption-font-size" id="youtube-synced-caption-font-size-value">28px</output>
+</span>
+</label>
+<label class="youtube-synced-caption-setting" for="youtube-synced-caption-max-width">
+<span>표시창 최대 너비</span>
+<span class="youtube-synced-caption-setting__control">
+<input aria-label="배속 동기화 자막 표시창의 영상 대비 최대 너비" disabled="" id="youtube-synced-caption-max-width" max="100" min="30" step="1" type="range" value="92"/>
+<output for="youtube-synced-caption-max-width" id="youtube-synced-caption-max-width-value">92%</output>
+</span>
+</label>
+<label class="youtube-synced-caption-setting" for="youtube-synced-caption-line-count">
+<span>자막 줄 수</span>
+<select aria-label="배속 동기화 자막의 선호 줄 수" disabled="" id="youtube-synced-caption-line-count">
+<option value="0">자동 · 원문 유지</option>
+<option value="1">최대 1줄 우선</option>
+<option value="2">최대 2줄 우선</option>
+<option value="3">최대 3줄 우선</option>
+<option value="4">최대 4줄 우선</option>
+<option value="5">최대 5줄 우선</option>
+<option value="6">최대 6줄 우선</option>
+</select>
+</label>
+<p class="youtube-synced-caption-layout-note">숫자를 선택하면 원문의 줄바꿈을 공백으로 합친 뒤 선택한 줄 수 안에 배치합니다. 문장을 숨기지 않으므로 설정한 너비에 담기지 않는 긴 자막은 더 많은 줄로 표시될 수 있습니다.</p>
+<label class="caption-overflow-setting" for="caption-overflow-mode">자막이 영상보다 커지는 경우
+              <select id="caption-overflow-mode"><option value="scroll">설정 크기 유지 · 안내와 스크롤 표시</option><option value="expand">영상 너비까지 확장 · 부족하면 스크롤</option></select>
+</label>
+<button class="text-button youtube-synced-caption-position-reset" disabled="" id="youtube-synced-caption-position-reset" type="button">자막 위치를 가운데 아래로 되돌리기</button>
+</div></div></details></div>
+<details class="subsection" id="caption-export-settings"><summary>자막 텍스트 복사와 저장</summary><div class="subsection-body"><div class="youtube-transcript-options">
+<label class="youtube-transcript-check" for="youtube-transcript-title-toggle">
+<input checked="" disabled="" id="youtube-transcript-title-toggle" type="checkbox"/>
+<span>영상 제목 포함</span>
+</label>
+<label class="youtube-transcript-check" for="youtube-transcript-time-toggle">
+<input disabled="" id="youtube-transcript-time-toggle" type="checkbox"/>
+<span>재생 시간 포함</span>
+</label>
+</div><label class="youtube-transcript-field youtube-transcript-field--inline" for="youtube-transcript-spacing">
+<span>자막 줄 사이의 빈 줄</span>
+<select disabled="" id="youtube-transcript-spacing">
+<option value="0">없음</option>
+<option value="1">1개</option>
+<option value="2">2개</option>
+<option value="3">3개</option>
+</select>
+</label><p class="youtube-transcript-note">선택한 탭의 표시 순서대로 처리합니다. 자막을 제공하지 않거나 메모리에서 내려간 탭은 건너뛰고 결과에 오류를 표시합니다.</p><div class="youtube-transcript-actions youtube-transcript-actions--batch">
+<button class="youtube-transcript-button" disabled="" id="youtube-transcript-copy" type="button">
+<svg aria-hidden="true" height="17" viewbox="0 0 24 24" width="17">
+<path d="M8 8.75A2.75 2.75 0 0 1 10.75 6h7.5A2.75 2.75 0 0 1 21 8.75v7.5A2.75 2.75 0 0 1 18.25 19h-7.5A2.75 2.75 0 0 1 8 16.25v-7.5Zm2 0v7.5c0 .414.336.75.75.75h7.5a.75.75 0 0 0 .75-.75v-7.5a.75.75 0 0 0-.75-.75h-7.5a.75.75 0 0 0-.75.75ZM3 5.75A2.75 2.75 0 0 1 5.75 3h7.5A2.75 2.75 0 0 1 16 5.75V6h-2v-.25a.75.75 0 0 0-.75-.75h-7.5a.75.75 0 0 0-.75.75v7.5c0 .414.336.75.75.75H6v2h-.25A2.75 2.75 0 0 1 3 13.25v-7.5Z" fill="currentColor"></path>
+</svg>
+<span id="youtube-transcript-copy-label">선택 자막 모두 복사</span>
+<span aria-hidden="true" class="youtube-transcript-spinner"></span>
+</button>
+<button class="youtube-transcript-button youtube-transcript-button--secondary" disabled="" id="youtube-transcript-download" type="button">
+<svg aria-hidden="true" height="17" viewbox="0 0 24 24" width="17">
+<path d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17V3Zm-6 16h14v2H5v-2Z" fill="currentColor"></path>
+</svg>
+<span id="youtube-transcript-download-label">한 파일로 저장</span>
+<span aria-hidden="true" class="youtube-transcript-spinner"></span>
+</button>
+<button class="youtube-transcript-button youtube-transcript-button--tertiary" disabled="" id="youtube-transcript-download-separate" type="button">
+<svg aria-hidden="true" height="17" viewbox="0 0 24 24" width="17">
+<path d="M4 3h10a2 2 0 0 1 2 2v2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v10h2V9a2 2 0 0 1 2-2h6V5H4Zm4 4v10h10V9H8Zm4 1h2v4h2l-3 3-3-3h2v-4Z" fill="currentColor"></path>
+</svg>
+<span id="youtube-transcript-download-separate-label">개별 파일 일괄 저장</span>
+<span aria-hidden="true" class="youtube-transcript-spinner"></span>
+</button>
+</div></div></details></div>
+</div>
+</section></section><section aria-labelledby="nav-tabs" class="workspace-panel" data-entry-toggle="tab-url-toggle" data-section="tabs" hidden="" id="view-tabs" role="tabpanel" tabindex="0"><div class="view-heading"><h2>열린 탭</h2><p>탭을 선택한 뒤 원하는 작업을 실행하세요.</p></div><section aria-labelledby="tab-copy-heading" class="tab-copy-card">
+<button aria-controls="tab-url-dropdown" aria-expanded="false" class="tab-copy-toggle" id="tab-url-toggle" type="button">
+<svg aria-hidden="true" class="tab-copy-toggle__icon" height="19" viewbox="0 0 24 24" width="19">
+<path d="M8.5 6.5h-2A3.5 3.5 0 0 0 3 10v7a3.5 3.5 0 0 0 3.5 3.5h7A3.5 3.5 0 0 0 17 17v-2h-2v2a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 5 17v-7a1.5 1.5 0 0 1 1.5-1.5h2v-2ZM10.5 3h7A3.5 3.5 0 0 1 21 6.5v7a3.5 3.5 0 0 1-3.5 3.5h-7A3.5 3.5 0 0 1 7 13.5v-7A3.5 3.5 0 0 1 10.5 3Zm0 2A1.5 1.5 0 0 0 9 6.5v7a1.5 1.5 0 0 0 1.5 1.5h7a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 17.5 5h-7Z" fill="currentColor"></path>
+</svg>
+<span class="tab-copy-toggle__copy">
+<strong id="tab-copy-heading">열린 탭 선택</strong>
+<span>선택한 탭의 URL, 활성 상태와 사이트 데이터를 관리합니다.</span>
+</span>
+<svg aria-hidden="true" class="tab-copy-toggle__chevron" height="18" viewbox="0 0 20 20" width="18">
+<path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+</button>
+<div class="tab-url-dropdown" hidden="" id="tab-url-dropdown">
+<div class="tab-keep-active-master">
+<span class="tab-keep-active-master__copy">
+<strong>모든 탭의 페이지 활성 상태 유지</strong>
+<span id="tab-keep-active-global-summary">현재와 새로 열리는 웹페이지 탭에 적용합니다.</span>
+</span>
+<label class="switch" title="모든 웹페이지 탭의 페이지 활성 상태 유지">
+<input aria-label="모든 탭의 페이지 활성 상태 유지" id="tab-keep-active-global-toggle" type="checkbox"/>
+<span class="switch__track"><span class="switch__thumb"></span></span>
+</label>
+</div>
+<div class="tab-list-toolbar">
+<span id="tab-list-summary">현재 창의 탭을 불러옵니다.</span>
+<button class="text-button" id="refresh-tabs-button" type="button">새로고침</button>
+</div>
+<div class="tab-selection-row">
+<div class="tab-selection-actions">
+<button class="text-button" id="select-all-tabs-button" type="button">모두 선택</button>
+<button class="text-button" id="clear-tabs-button" type="button">선택 해제</button>
+</div>
+<span id="selected-tabs-count">0개 선택</span>
+</div><div aria-label="활성 상태 유지, URL 복사 또는 사이트 데이터 삭제에 사용할 탭 선택" class="tab-list" id="tab-list" role="group"></div>
+<div class="tab-action-buttons"><button class="copy-tab-urls-button" disabled="" id="copy-tab-urls-button" type="button">
+<svg aria-hidden="true" height="17" viewbox="0 0 24 24" width="17">
+<path d="M8 8.75A2.75 2.75 0 0 1 10.75 6h7.5A2.75 2.75 0 0 1 21 8.75v7.5A2.75 2.75 0 0 1 18.25 19h-7.5A2.75 2.75 0 0 1 8 16.25v-7.5Zm2 0v7.5c0 .414.336.75.75.75h7.5a.75.75 0 0 0 .75-.75v-7.5a.75.75 0 0 0-.75-.75h-7.5a.75.75 0 0 0-.75.75ZM3 5.75A2.75 2.75 0 0 1 5.75 3h7.5A2.75 2.75 0 0 1 16 5.75V6h-2v-.25a.75.75 0 0 0-.75-.75h-7.5a.75.75 0 0 0-.75.75v7.5c0 .414.336.75.75.75H6v2h-.25A2.75 2.75 0 0 1 3 13.25v-7.5Z" fill="currentColor"></path>
+</svg>
+<span id="copy-tab-urls-label">선택한 URL 복사</span>
+</button><div class="tab-keep-active-action-buttons">
+<button class="tab-keep-active-button" disabled="" id="enable-selected-tab-keep-active" type="button">
+<svg aria-hidden="true" height="17" viewbox="0 0 24 24" width="17">
+<path d="M12 2a7 7 0 0 0-7 7v3.17A3 3 0 0 0 3 15v4a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-4a3 3 0 0 0-2-2.83V9a7 7 0 0 0-7-7Zm5 10H7V9a5 5 0 0 1 10 0v3Zm-5 3a2 2 0 0 1 1 3.73V20h-2v-1.27A2 2 0 0 1 12 15Z" fill="currentColor"></path>
+</svg>
+<span id="enable-selected-tab-keep-active-label">선택한 탭의 페이지 활성 상태 유지</span>
+</button>
+<button class="tab-keep-active-button tab-keep-active-button--restore" disabled="" id="disable-selected-tab-keep-active" type="button">
+<svg aria-hidden="true" height="17" viewbox="0 0 24 24" width="17">
+<path d="M7.05 5.64A8 8 0 1 1 4 12H2a10 10 0 1 0 3.64-7.73L3 1.63V8h6.37L7.05 5.64ZM11 7h2v6h-2V7Zm0 8h2v2h-2v-2Z" fill="currentColor"></path>
+</svg>
+<span id="disable-selected-tab-keep-active-label">선택한 탭을 원래 상태로 복원</span>
+</button>
+</div><div class="danger-zone"><h3>선택한 사이트의 데이터 삭제</h3><p>쿠키 삭제로 로그인 상태가 해제될 수 있습니다. 같은 등록 가능 도메인의 하위 사이트에도 영향을 줄 수 있습니다. 버튼을 누르면 즉시 실행됩니다.</p><button class="clear-site-data-button" disabled="" id="clear-site-data-button" type="button">
+<svg aria-hidden="true" height="17" viewbox="0 0 24 24" width="17">
+<path d="M9 3.5A1.5 1.5 0 0 1 10.5 2h3A1.5 1.5 0 0 1 15 3.5V5h4a1 1 0 1 1 0 2h-.61l-.83 12.05A3.2 3.2 0 0 1 14.37 22H9.63a3.2 3.2 0 0 1-3.19-2.95L5.61 7H5a1 1 0 1 1 0-2h4V3.5Zm2 0V5h2V3.5h-2ZM7.62 7l.82 11.91a1.2 1.2 0 0 0 1.19 1.09h4.74a1.2 1.2 0 0 0 1.19-1.09L16.38 7H7.62Zm2.33 2.95a1 1 0 0 1 1.05.95l.3 6a1 1 0 1 1-2 .1l-.3-6a1 1 0 0 1 .95-1.05Zm4.1 0A1 1 0 0 1 15 11l-.3 6a1 1 0 0 1-2-.1l.3-6a1 1 0 0 1 1.05-.95Z" fill="currentColor"></path>
+</svg>
+<span id="clear-site-data-label">선택한 사이트의 쿠키와 캐시 삭제</span>
+</button></div></div>
+<details class="subsection" id="tab-operation-help"><summary>활성 상태 유지와 삭제 범위 안내</summary><div class="subsection-body"><p class="tab-site-data-note">
+            페이지 활성 상태 유지는 백그라운드 탭과 최소화된 창의 탭에 Chrome의 공식 포커스 에뮬레이션을 적용하고 자동 탭 폐기를 막습니다. 최소화되지 않은 각 Chrome 창의 활성 탭에서는 지속적인 디버거 연결을 해제하고 Chrome의 기본 렌더링 상태를 사용하여 브라우저 전체 화면과 NVIDIA RTX Video 같은 기본 영상 처리 경로를 보존합니다. 다른 프로그램이나 Chrome 창으로 포커스를 옮긴 경우에는 활성 탭이 실제 포커스를 보고하지 않을 수 있습니다. 여러 탭을 실제 선택 탭으로 만드는 기능은 아니며, 개발자 도구와의 충돌은 포커스 에뮬레이션을 사용하는 백그라운드 또는 최소화된 탭에만 해당합니다. 쿠키와 캐시 삭제는 방문 기록, 비밀번호와 로컬 저장소를 삭제하지 않습니다.
+          </p></div></details></div>
+</section></section><section aria-labelledby="nav-page" class="workspace-panel" data-section="page" hidden="" id="view-page" role="tabpanel" tabindex="0"><div class="view-heading"><h2>페이지 도구</h2><p>화면을 저장하고 웹페이지의 입력 제한을 관리하세요.</p></div><section aria-labelledby="capture-heading" class="capture-card">
+<div class="capture-copy">
+<h2 id="capture-heading">캡처와 파일 도구</h2>
+<p>화면을 캡처하거나, 파일 포함 이미지를 만들거나, 페이지 요소를 직접 클릭하여 숨깁니다.</p>
+</div>
+<div class="capture-actions">
+<button class="capture-button" id="full-page-button" type="button">
+<svg aria-hidden="true" class="capture-button__icon" height="18" viewbox="0 0 24 24" width="18">
+<path d="M8.25 5.5 9.5 3.75h5L15.75 5.5H19a2.25 2.25 0 0 1 2.25 2.25v9A2.25 2.25 0 0 1 19 19H5a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 5 5.5h3.25Zm3.75 2A4.25 4.25 0 1 0 12 16a4.25 4.25 0 0 0 0-8.5Zm0 1.5a2.75 2.75 0 1 1 0 5.5A2.75 2.75 0 0 1 12 9Z" fill="currentColor"></path>
+</svg>
+<span id="full-page-button-label">현재 페이지 전체 캡처</span>
+<span aria-hidden="true" class="capture-button__spinner"></span>
+</button>
+<button class="capture-button capture-button--secondary" id="area-button" type="button">
+<svg aria-hidden="true" class="capture-button__icon" height="18" viewbox="0 0 24 24" width="18">
+<path d="M4 9V5a1 1 0 0 1 1-1h4v2H6v3H4Zm11-5h4a1 1 0 0 1 1 1v4h-2V6h-3V4ZM6 15v3h3v2H5a1 1 0 0 1-1-1v-4h2Zm14 0v4a1 1 0 0 1-1 1h-4v-2h3v-3h2ZM8 8h8v8H8V8Zm2 2v4h4v-4h-4Z" fill="currentColor"></path>
+</svg>
+<span id="area-button-label">드래그하여 영역 캡처</span>
+<span aria-hidden="true" class="capture-button__spinner"></span>
+</button>
+<button class="capture-button capture-button--file" id="file-to-image-button" type="button">
+<svg aria-hidden="true" class="capture-button__icon" height="18" viewbox="0 0 24 24" width="18">
+<path d="M5.75 3A2.75 2.75 0 0 0 3 5.75v12.5A2.75 2.75 0 0 0 5.75 21h12.5A2.75 2.75 0 0 0 21 18.25V5.75A2.75 2.75 0 0 0 18.25 3H5.75ZM5 5.75c0-.41.34-.75.75-.75h12.5c.41 0 .75.34.75.75v7.7l-2.42-2.42a1.75 1.75 0 0 0-2.47 0l-1.4 1.4-1.5-1.5a1.75 1.75 0 0 0-2.47 0L5 13.92V5.75Zm0 10.99 4.4-4.4 1.5 1.5a1.5 1.5 0 0 0 2.12 0l1.58-1.58 4.4 4.4v1.59c0 .41-.34.75-.75.75H5.75a.75.75 0 0 1-.75-.75v-1.51ZM8.5 6.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm7.5 8.25h2v1.5h-2v2h-1.5v-2h-2v-1.5h2v-2H16v2Z" fill="currentColor"></path>
+</svg>
+<span id="file-to-image-button-label">파일 포함 이미지 만들기</span>
+<span aria-hidden="true" class="capture-button__spinner"></span>
+</button>
+</div>
+<details class="subsection" id="capture-path-help"><summary>파일이 저장되는 위치</summary><div class="subsection-body"><div aria-label="화면 캡처 저장 위치" class="capture-paths">
+<p>전체: 다운로드\full_page_screenshots</p>
+<p>영역: 다운로드\selected_area_screenshots</p>
+<p>파일 포함 이미지: 다운로드\file_bundles</p>
+</div></div></details>
+<div aria-hidden="true" class="page-tool-divider"></div>
+<div class="element-eraser-tool">
+<button aria-controls="element-eraser-dropdown" aria-expanded="false" class="element-eraser-toggle" id="element-eraser-toggle" type="button">
+<svg aria-hidden="true" class="element-eraser-toggle__icon" height="19" viewbox="0 0 24 24" width="19">
+<path d="M5.25 3.5a1 1 0 0 1 1.42-.91l12.2 5.93a1 1 0 0 1-.16 1.86l-5.08 1.55 2.65 5.02a1 1 0 0 1-.42 1.35l-2.2 1.16a1 1 0 0 1-1.35-.42l-2.64-5.01-3.03 4.34a1 1 0 0 1-1.82-.53L5.25 3.5Zm2.02 1.72-.3 9.53 2.02-2.9a1 1 0 0 1 1.7.1l3.02 5.73.43-.23-3.03-5.73a1 1 0 0 1 .59-1.42l3.4-1.04-7.83-4.04Z" fill="currentColor"></path>
+</svg>
+<span class="element-eraser-toggle__copy">
+<strong id="element-eraser-heading">클릭하여 페이지 요소 숨기기</strong>
+<span>숨기는 방식을 선택한 뒤 페이지에서 요소를 연속해서 클릭합니다.</span>
+</span>
+<svg aria-hidden="true" class="element-eraser-toggle__chevron" height="18" viewbox="0 0 20 20" width="18">
+<path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+</button>
+<div class="element-eraser-dropdown" hidden="" id="element-eraser-dropdown">
+<div aria-label="페이지 요소 숨기기 방식 선택" class="element-eraser-mode-list" role="group">
+<button class="element-eraser-mode" data-eraser-mode="temporary" type="button">
+<span class="element-eraser-mode__title">이번 페이지에서만 숨기기</span>
+<span class="element-eraser-mode__description">현재 페이지에서만 숨기며 새로 고치면 다시 나타납니다.</span>
+</button>
+<button class="element-eraser-mode element-eraser-mode--persistent" data-eraser-mode="persistent" type="button">
+<span class="element-eraser-mode__title">이 사이트에 기억해서 숨기기</span>
+<span class="element-eraser-mode__description">같은 사이트를 다시 방문해도 선택한 요소를 계속 숨깁니다.</span>
+</button>
+</div>
+<div class="element-eraser-memory">
+<span id="element-eraser-site-summary">현재 사이트의 기억된 요소를 확인합니다.</span>
+<button class="text-button" disabled="" id="clear-element-eraser-rules" type="button">모두 복원</button>
+</div>
+</div>
+</div>
+</section><section aria-labelledby="page-unlock-heading" class="page-unlock-card">
+<button aria-controls="page-unlock-dropdown" aria-expanded="false" class="page-unlock-toggle" id="page-unlock-toggle" type="button">
+<svg aria-hidden="true" class="page-unlock-toggle__icon" height="19" viewbox="0 0 24 24" width="19">
+<path d="M5.25 3.5a1 1 0 0 1 1.42-.91l12.2 5.93a1 1 0 0 1-.16 1.86l-5.08 1.55 2.65 5.02a1 1 0 0 1-.42 1.35l-2.2 1.16a1 1 0 0 1-1.35-.42l-2.64-5.01-3.03 4.34a1 1 0 0 1-1.82-.53L5.25 3.5Zm2.02 1.72-.3 9.53 2.02-2.9a1 1 0 0 1 1.7.1l3.02 5.73.43-.23-3.03-5.73a1 1 0 0 1 .59-1.42l3.4-1.04-7.83-4.04Z" fill="currentColor"></path>
+</svg>
+<span class="page-unlock-toggle__copy">
+<strong id="page-unlock-heading">웹페이지 입력 제한 해제</strong>
+<span id="page-unlock-summary">7개 기능을 개별적으로 설정합니다.</span>
+</span>
+<svg aria-hidden="true" class="page-unlock-toggle__chevron" height="18" viewbox="0 0 20 20" width="18">
+<path d="m5.5 7.5 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+</button>
+<div class="page-unlock-dropdown" hidden="" id="page-unlock-dropdown">
+<div class="setting-row setting-row--compact page-unlock-master-row">
+<div class="setting-copy">
+<h2>7개 기능 한 번에 설정</h2>
+<p>모두 켜거나 모두 끕니다. 일부만 켜져 있으면 중간 상태로 표시됩니다.</p>
+</div>
+<label class="switch switch--master" for="page-unlock-master-toggle">
+<input aria-label="웹페이지 입력 제한 해제 기능 7개를 한 번에 켜거나 끄기" disabled="" id="page-unlock-master-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div>
+<div class="setting-row setting-row--compact">
+<div class="setting-copy">
+<h2>우클릭 메뉴 허용</h2>
+<p>웹사이트가 막은 Chrome 기본 우클릭 메뉴를 사용합니다.</p>
+</div>
+<label class="switch" for="right-click-toggle">
+<input aria-label="웹사이트가 차단한 우클릭 메뉴 허용" disabled="" id="right-click-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div>
+<div class="setting-row setting-row--compact">
+<div class="setting-copy">
+<h2>텍스트 드래그 및 선택 허용</h2>
+<p>텍스트를 드래그하여 선택하고 복사할 수 있게 합니다.</p>
+</div>
+<label class="switch" for="text-selection-toggle">
+<input aria-label="웹사이트가 차단한 텍스트 드래그와 선택 허용" disabled="" id="text-selection-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div>
+<div class="setting-row setting-row--compact">
+<div class="setting-copy">
+<h2>복사 차단 및 문구 변경 방지</h2>
+<p>복사를 취소하거나 다른 문구로 바꾸는 사이트 동작을 막습니다.</p>
+</div>
+<label class="switch" for="copy-unlock-toggle">
+<input aria-label="웹사이트의 복사 취소와 복사 문구 변경 방지" disabled="" id="copy-unlock-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div>
+<div class="setting-row setting-row--compact">
+<div class="setting-copy">
+<h2>클립보드 덧붙이기 방지</h2>
+<p>선택한 텍스트만 복사하여 사이트 주소 등의 추가 문구를 막습니다.</p>
+</div>
+<label class="switch" for="clipboard-protection-toggle">
+<input aria-label="클립보드에 사이트 주소와 추가 문구를 덧붙이는 동작 방지" disabled="" id="clipboard-protection-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div>
+<div class="setting-row setting-row--compact">
+<div class="setting-copy">
+<h2>이미지 드래그 허용</h2>
+<p>웹사이트가 막은 이미지 끌어서 옮기기를 다시 사용합니다.</p>
+</div>
+<label class="switch" for="image-drag-toggle">
+<input aria-label="웹사이트가 차단한 이미지 드래그 허용" disabled="" id="image-drag-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div>
+<div class="setting-row setting-row--compact">
+<div class="setting-copy">
+<h2>Ctrl+클릭 및 가운데 버튼 허용</h2>
+<p>일반 클릭은 그대로 두고, Ctrl+클릭과 가운데 클릭은 Chrome의 기본 동작으로 연 뒤 생성된 탭을 현재 탭 바로 오른쪽에 배치합니다. 빈 영역의 휠 클릭 자동 스크롤도 다시 사용합니다.</p>
+</div>
+<label class="switch" for="middle-click-toggle">
+<input aria-label="일반 클릭은 유지하고 Ctrl+클릭과 가운데 클릭으로 Chrome이 연 탭을 현재 탭 바로 오른쪽에 배치하며 빈 영역의 휠 클릭 자동 스크롤 허용" disabled="" id="middle-click-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div>
+<div class="setting-row setting-row--compact">
+<div class="setting-copy">
+<h2>뒤로 가기 방해 차단</h2>
+<p>방문 기록을 반복 추가하거나 뒤로 이동 직후 다시 보내는 동작을 막습니다.</p>
+</div>
+<label class="switch" for="back-navigation-toggle">
+<input aria-label="웹사이트의 뒤로 가기 방해 차단" disabled="" id="back-navigation-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div>
+</div>
+</section></section><section aria-labelledby="nav-chat" class="workspace-panel" data-section="chat" hidden="" id="view-chat" role="tabpanel" tabindex="0"><div class="view-heading"><h2>ChatGPT</h2><p>메시지 전송 방식과 대화 공간을 조절하세요.</p></div><section aria-label="Ctrl과 Enter 단축키 기능 설정" class="settings"><div class="card-heading"><h2>Ctrl + Enter로 전송</h2><div aria-label="단축키 Ctrl 더하기 Enter" class="shortcut">
+<kbd>Ctrl</kbd>
+<span aria-hidden="true">+</span>
+<kbd>Enter</kbd>
+</div></div>
+<div class="setting-row">
+<div class="setting-copy">
+<h2>새 메시지 입력란</h2>
+<p>화면 하단 입력란에서 메시지를 전송합니다.</p>
+</div>
+<label class="switch" for="composer-toggle">
+<input aria-label="새 메시지 입력란에서 Ctrl과 Enter로 전송" disabled="" id="composer-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div>
+<div class="setting-row">
+<div class="setting-copy">
+<h2>이전 메시지 편집란</h2>
+<p>연필 모양 버튼으로 연 편집란에서 전송합니다.</p>
+</div>
+<label class="switch" for="message-edit-toggle">
+<input aria-label="이전 메시지 편집란에서 Ctrl과 Enter로 전송" disabled="" id="message-edit-toggle" type="checkbox"/>
+<span aria-hidden="true" class="switch__track">
+<span class="switch__thumb"></span>
+</span>
+</label>
+</div>
+</section><section aria-labelledby="chat-width-heading" class="chat-width-card">
+<div class="chat-width-header">
+<div class="chat-width-copy">
+<h2 id="chat-width-heading">대화와 입력란 너비</h2>
+<p>대화 기록과 화면 하단 입력란의 너비를 각각 조절합니다.</p>
+</div>
+</div>
+<div class="chat-width-setting">
+<div class="chat-width-setting__header">
+<strong>대화 기록 너비</strong>
+<output class="chat-width-value" for="chat-width-slider" id="chat-width-value">960픽셀</output>
+</div>
+<div class="chat-width-control">
+<input aria-label="ChatGPT 대화 기록 너비 조절" aria-valuetext="960픽셀" class="chat-width-slider" disabled="" id="chat-width-slider" max="35" min="0" step="1" type="range" value="9"/>
+<div aria-hidden="true" class="chat-width-scale">
+<span>기본 너비</span>
+<span>2,000픽셀</span>
+</div>
+</div>
+</div>
+<div class="chat-width-setting">
+<div class="chat-width-setting__header">
+<strong>새 메시지 입력란 너비</strong>
+<output class="chat-width-value" for="composer-width-slider" id="composer-width-value">ChatGPT 기본 너비</output>
+</div>
+<div class="chat-width-control">
+<input aria-label="ChatGPT 새 메시지 입력란 너비 조절" aria-valuetext="ChatGPT 기본 너비" class="chat-width-slider" disabled="" id="composer-width-slider" max="35" min="0" step="1" type="range" value="0"/>
+<div aria-hidden="true" class="chat-width-scale">
+<span>기본 너비</span>
+<span>2,000픽셀</span>
+</div>
+</div>
+</div>
+<p class="chat-width-note">각 슬라이더의 왼쪽 끝은 ChatGPT의 기본 너비이며, 변경 내용은 열려 있는 ChatGPT 탭에 즉시 적용됩니다.</p>
+<details class="settings-tools-card">
+<summary>현재 탭의 실제 너비</summary>
+<p>설정값과 현재 표시된 대화·입력란 컨테이너의 측정값을 구분합니다. 화면이 좁으면 지정한 너비보다 작게 표시됩니다.</p>
+<button class="settings-tools-button" id="chat-width-inspect" type="button">현재 너비 확인</button>
+<button class="settings-tools-button" id="chat-width-copy-diagnostics" type="button" style="margin-top:8px">구조 진단 복사</button>
+<p>대화 내용 없이 너비 클래스·요소 구조·계산된 크기만 복사합니다. 너비가 적용되지 않을 때 사용합니다.</p>
+<p id="chat-width-copy-status" aria-live="polite" hidden></p>
+<pre id="chat-width-inspection" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;margin:12px 0 0" hidden></pre>
+</details>
+</section></section><section aria-labelledby="nav-settings" class="workspace-panel" data-section="settings" hidden="" id="view-settings" role="tabpanel" tabindex="0"><div class="view-heading"><h2>설정과 진단</h2><p>설정을 백업하고 현재 탭의 상태를 확인하세요.</p></div><details class="settings-tools-card">
+<summary>설정 백업과 진단</summary>
+<p>설정 ZIP을 저장하거나 복원합니다. 쿠키·방문 기록·탭별 세션·자막 문장은 포함하지 않습니다.</p>
+<label class="settings-tools-option"><input id="settings-include-rules" type="checkbox"/>사이트별 요소 숨김 규칙도 포함·복원합니다.</label>
+<small>이 옵션을 켜면 사이트 주소와 선택자가 백업에 포함되며, 가져올 때 기억한 규칙 전체가 백업 내용으로 교체됩니다.</small>
+<button class="settings-tools-button" id="settings-export" type="button">설정 ZIP 저장</button>
+<label class="settings-tools-file" for="settings-import-file">복원할 설정 ZIP 선택<input accept=".zip,application/zip" id="settings-import-file" type="file"/></label>
+<label class="settings-tools-option"><input id="settings-include-global" type="checkbox"/>전체 탭 활성 유지 설정도 복원합니다.</label>
+<small>기본적으로 현재의 전체 탭 활성 유지 설정은 바꾸지 않습니다. 선택하면 디버거 연결이 시작되거나 해제될 수 있습니다.</small>
+<pre hidden="" id="settings-import-preview"></pre>
+<button class="settings-tools-button" disabled="" hidden="" id="settings-import-apply" type="button">확인한 설정 적용</button>
+<p aria-live="polite" id="settings-tools-status" role="status"></p>
+<div class="content-group"><h3>현재 탭 진단</h3><button class="settings-tools-button" id="settings-copy-diagnostics" type="button">현재 탭의 진단 정보 복사</button><small>읽기 전용입니다. 디버거를 연결하지 않으며 NVIDIA VSR의 실제 GPU 적용 여부는 측정하지 않습니다.</small><textarea aria-label="복사할 진단 정보" hidden="" id="settings-diagnostics-text" readonly="" rows="7"></textarea></div></details></section></div></div><footer class="app-footer"><span class="footer-label" aria-hidden="true">최근 작업</span><p aria-atomic="true" aria-live="polite" class="status" id="status" role="status">설정을 불러오는 중입니다.</p></footer><section aria-label="기능 검색 결과" class="search-results" hidden="" id="popup-search-results"><p class="search-summary" id="popup-search-summary" role="status"></p><div class="search-items" id="popup-search-items"></div></section></main>
+<script src="dist/toolbox_shared.js"></script>
+<script src="dist/popup.js"></script>
+<script src="dist/youtube_transcript_popup.js"></script>
+<script src="dist/settings_transfer.js"></script>
+<script src="dist/settings_tools_popup.js"></script>
+<script src="dist/youtube_tools_popup.js"></script>
+<script src="dist/youtube_quality_popup.js"></script>
+<script src="dist/popup_navigation.js"></script></body>
 </html>
