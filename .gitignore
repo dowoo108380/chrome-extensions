@@ -1,0 +1,12 @@
+node_modules/
+.venv/
+release/
+*.zip
+Thumbs.db
+.DS_Store
+.test_*/
+__pycache__/
+.worklogs/
+.worklogs-*
+analysis/
+docs/verification/
