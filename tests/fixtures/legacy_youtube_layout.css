@@ -1,0 +1,40 @@
+/* Scoped to extension-owned UI. No global YouTube overrides, filters or blurring. */
+#btx-youtube-tabs {
+  --btx-surface: var(--yt-spec-base-background, #fff);
+  --btx-soft: var(--yt-spec-badge-chip-background, #f2f2f2);
+  --btx-text: var(--yt-spec-text-primary, #161616);
+  --btx-muted: var(--yt-spec-text-secondary, #606060);
+  --btx-border: var(--yt-spec-10-percent-layer, #dedede);
+  width:100%; min-width:0; box-sizing:border-box; margin:0 0 16px;
+  border:1px solid var(--btx-border); border-radius:14px; background:var(--btx-surface);
+  color:var(--btx-text); font:13px/1.5 Roboto, "YouTube Sans", Arial, sans-serif;
+}
+html[dark] #btx-youtube-tabs { --btx-surface:var(--yt-spec-base-background,#0f0f0f); --btx-soft:var(--yt-spec-badge-chip-background,#272727); --btx-text:var(--yt-spec-text-primary,#f1f1f1); --btx-muted:var(--yt-spec-text-secondary,#aaa); --btx-border:var(--yt-spec-10-percent-layer,#333); }
+#btx-youtube-tabs *, #btx-youtube-tabs *::before, #btx-youtube-tabs *::after { box-sizing:border-box; }
+#btx-youtube-tabs > .btx-tabs-header { display:flex; align-items:center; gap:4px; padding:6px; border-bottom:1px solid var(--btx-border); border-radius:14px 14px 0 0; }
+#btx-youtube-tabs > .btx-tabs-header > button { flex:1 1 0; min-width:0; display:flex; align-items:center; justify-content:center; gap:6px; padding:10px 6px; border:0; border-radius:8px; background:transparent; color:var(--btx-muted); font:500 13px/1.25 Roboto,Arial,sans-serif; cursor:pointer; white-space:nowrap; }
+#btx-youtube-tabs > .btx-tabs-header > button:hover { background:var(--btx-soft); color:var(--btx-text); }
+#btx-youtube-tabs > .btx-tabs-header > button[aria-selected="true"] { background:var(--btx-soft); color:var(--btx-text); font-weight:700; }
+#btx-youtube-tabs > .btx-tabs-header > button[aria-disabled="true"] { opacity:.55; cursor:default; }
+#btx-youtube-tabs button:focus-visible { outline:2px solid #3ea6ff; outline-offset:-2px; }
+#btx-youtube-tabs .btx-tabs-label { overflow:hidden; text-overflow:ellipsis; }
+#btx-youtube-tabs .btx-tabs-icon { width:16px; height:16px; flex:none; pointer-events:none; }
+#btx-youtube-tabs > .btx-tabs-body > .btx-tab-pane { padding:14px; min-width:0; overflow-wrap:anywhere; }
+#btx-youtube-tabs .btx-tab-pane[hidden], #btx-youtube-tabs > .btx-tabs-body[hidden], #btx-youtube-tabs > .btx-native-note[hidden] { display:none !important; }
+#btx-youtube-tabs > .btx-native-note { margin:0; padding:12px 14px; color:var(--btx-muted); font-size:12px; }
+#btx-youtube-tabs[data-scroll="true"] > .btx-tabs-body > .btx-tab-pane { max-height:var(--btx-pane-height,calc(100dvh - 184px)); overflow:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--btx-muted) transparent; }
+#btx-youtube-tabs .btx-tab-pane > [data-btx-layout-owned] { margin-top:0 !important; margin-bottom:0 !important; max-width:100%; min-width:0; }
+#btx-youtube-tabs[data-orphan="true"] > .btx-tabs-body { display:block !important; }
+#btx-youtube-tabs[data-orphan="true"] .btx-tab-pane { display:block !important; }
+@media (max-width:980px) {
+  #btx-youtube-tabs { margin-top:12px; }
+  #btx-youtube-tabs[data-scroll="true"] > .btx-tabs-body > .btx-tab-pane { max-height:65dvh; }
+}
+/* Expand real text on hover/focus, without removing subscription/action buttons. */
+[data-btx-channel-name] #owner #upload-info:hover,
+[data-btx-channel-name] #owner #upload-info:focus-within { min-width:0 !important; max-width:100% !important; }
+[data-btx-channel-name] #owner #upload-info:is(:hover,:focus-within) #channel-name,
+[data-btx-channel-name] #owner #upload-info:is(:hover,:focus-within) #channel-name #text,
+[data-btx-channel-name] #owner #upload-info:is(:hover,:focus-within) #channel-name a {
+  white-space:normal !important; overflow:visible !important; text-overflow:clip !important; max-width:none !important; overflow-wrap:anywhere;
+}

@@ -1,0 +1,807 @@
+{
+  "composer-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "message-edit-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "chat-width-heading": {
+    "tag": "h2",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "chat-width-value": {
+    "tag": "output",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "chat-width-slider": {
+    "tag": "input",
+    "type": "range",
+    "min": "0",
+    "max": "35",
+    "step": "1"
+  },
+  "composer-width-value": {
+    "tag": "output",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "composer-width-slider": {
+    "tag": "input",
+    "type": "range",
+    "min": "0",
+    "max": "35",
+    "step": "1"
+  },
+  "media-toggle": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-heading": {
+    "tag": "strong",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-summary": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-dropdown": {
+    "tag": "div",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-controller-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-rate-reset": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-rate-slider": {
+    "tag": "input",
+    "type": "range",
+    "min": "7",
+    "max": "1600",
+    "step": "1"
+  },
+  "media-rate-input": {
+    "tag": "input",
+    "type": "number",
+    "min": "0.07",
+    "max": "16",
+    "step": "0.01"
+  },
+  "media-speed-step-input": {
+    "tag": "input",
+    "type": "number",
+    "min": "0.01",
+    "max": "2",
+    "step": "0.01"
+  },
+  "media-seek-step-input": {
+    "tag": "input",
+    "type": "number",
+    "min": "1",
+    "max": "600",
+    "step": "1"
+  },
+  "media-reset-fallback-rate-input": {
+    "tag": "input",
+    "type": "number",
+    "min": "0.07",
+    "max": "16",
+    "step": "0.01"
+  },
+  "media-keep-rate-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-overlay-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-overlay-position-reset": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-keyboard-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-shortcut-heading": {
+    "tag": "h3",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-shortcut-reset": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-ab-keyboard-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "media-shortcut-hint": {
+    "tag": "p",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "settings-include-rules": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "settings-export": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "settings-import-file": {
+    "tag": "input",
+    "type": "file",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "settings-include-global": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "settings-import-preview": {
+    "tag": "pre",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "settings-import-apply": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "settings-copy-diagnostics": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "settings-diagnostics-text": {
+    "tag": "textarea",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "settings-tools-status": {
+    "tag": "p",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-tools-card": {
+    "tag": "details",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-tools-options": {
+    "tag": "div",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-tools-inspect": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-tools-copy-layout": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-tools-layout-json": {
+    "tag": "textarea",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-tools-status": {
+    "tag": "p",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-toggle": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-heading": {
+    "tag": "strong",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-summary": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-dropdown": {
+    "tag": "div",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-list-summary": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-refresh": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-select-all": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-clear": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-selected-count": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-tab-list": {
+    "tag": "div",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-synced-caption-font-size": {
+    "tag": "input",
+    "type": "range",
+    "min": "14",
+    "max": "64",
+    "step": "1"
+  },
+  "youtube-synced-caption-font-size-value": {
+    "tag": "output",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-synced-caption-max-width": {
+    "tag": "input",
+    "type": "range",
+    "min": "30",
+    "max": "100",
+    "step": "1"
+  },
+  "youtube-synced-caption-max-width-value": {
+    "tag": "output",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-synced-caption-line-count": {
+    "tag": "select",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "caption-overflow-mode": {
+    "tag": "select",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-synced-caption-position-reset": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-synced-caption-apply": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-synced-caption-apply-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-synced-caption-remove": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-synced-caption-remove-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-title-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-time-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-spacing": {
+    "tag": "select",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-copy": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-copy-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-download": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-download-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-download-separate": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "youtube-transcript-download-separate-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "page-unlock-toggle": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "page-unlock-heading": {
+    "tag": "strong",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "page-unlock-summary": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "page-unlock-dropdown": {
+    "tag": "div",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "page-unlock-master-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "right-click-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "text-selection-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "copy-unlock-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "clipboard-protection-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "image-drag-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "middle-click-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "back-navigation-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "capture-heading": {
+    "tag": "h2",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "full-page-button": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "full-page-button-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "area-button": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "area-button-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "file-to-image-button": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "file-to-image-button-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "element-eraser-toggle": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "element-eraser-heading": {
+    "tag": "strong",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "element-eraser-dropdown": {
+    "tag": "div",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "element-eraser-site-summary": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "clear-element-eraser-rules": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "tab-url-toggle": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "tab-copy-heading": {
+    "tag": "strong",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "tab-url-dropdown": {
+    "tag": "div",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "tab-keep-active-global-summary": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "tab-keep-active-global-toggle": {
+    "tag": "input",
+    "type": "checkbox",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "tab-list-summary": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "refresh-tabs-button": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "tab-list": {
+    "tag": "div",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "select-all-tabs-button": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "clear-tabs-button": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "selected-tabs-count": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "enable-selected-tab-keep-active": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "enable-selected-tab-keep-active-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "disable-selected-tab-keep-active": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "disable-selected-tab-keep-active-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "copy-tab-urls-button": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "copy-tab-urls-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "clear-site-data-button": {
+    "tag": "button",
+    "type": "button",
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "clear-site-data-label": {
+    "tag": "span",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  },
+  "status": {
+    "tag": "p",
+    "type": null,
+    "min": null,
+    "max": null,
+    "step": null
+  }
+}

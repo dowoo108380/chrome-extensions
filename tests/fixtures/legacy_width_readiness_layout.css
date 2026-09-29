@@ -1,0 +1,135 @@
+/* Extension UI, explicitly moved surfaces and verified watch-page flow shells.
+   Original content, links and media remain native. No document scroll clipping. */
+/* Applied only after all sections have actually moved into a normal two-column
+   panel. The marker is removed on disable/navigation/partial/theater/fullscreen,
+   so the site's current stylesheet and inline sizes take over without stale copies.
+   No html/body overflow rule, fixed viewport height or scroll position correction. */
+ytd-watch-flexy[data-btx-layout-flow="content"],
+ytd-watch-flexy [data-btx-layout-flow="content"],
+ytd-watch-flexy [data-btx-layout-flow="columns"] {
+  height:auto !important; block-size:auto !important;
+  min-height:0 !important; min-block-size:0 !important;
+  margin-bottom:0 !important; padding-bottom:0 !important;
+}
+/* One small trailing inset, not several inherited/reserved blank regions. */
+ytd-watch-flexy [data-btx-layout-flow="columns"] { padding-bottom:16px !important; }
+/* Verified ambient decoration only. Layout containment treats visible overflow
+   as ink overflow, not document scrolling (CSS Containment 2, section 3.2).
+   Deliberately NOT paint containment or overflow:hidden/clip: the glow can
+   still paint outside its box. Native video, captions and controls are untouched. */
+ytd-watch-flexy #cinematics[data-btx-layout-ambient="contained"] {
+  contain: size layout style !important;
+}
+
+ytd-watch-flexy [data-btx-layout-flow="content"] > #btx-youtube-tabs { margin-bottom:0; }
+
+/* Normal watch-page gutters. Only verified two-column shells receive markers.
+   Use the containing block (not 100vw) so a native app sidebar and scrollbars
+   keep their space. Preserve the site's sidebar width, grid tracks and player
+   sizing; no height/aspect-ratio/transform/overflow changes are made here. */
+@media (min-width:981px) {
+  ytd-watch-flexy[data-btx-layout-width="watch"]:not([theater]):not([fullscreen]):not(:has(:fullscreen)) {
+    box-sizing:border-box !important; width:100% !important; inline-size:100% !important;
+    max-width:none !important; max-inline-size:none !important; min-width:0 !important; min-inline-size:0 !important;
+    margin-inline:0 !important; padding-inline:0 !important;
+  }
+  ytd-watch-flexy[data-btx-layout-width="watch"]:not([theater]):not([fullscreen]):not(:has(:fullscreen)) > [data-btx-layout-width="columns"] {
+    box-sizing:border-box !important; width:100% !important; inline-size:100% !important;
+    max-width:none !important; max-inline-size:none !important; min-width:0 !important; min-inline-size:0 !important;
+    margin-inline:0 !important; padding-inline:16px !important; column-gap:16px !important;
+  }
+  ytd-watch-flexy[data-btx-layout-width="watch"]:not([theater]):not([fullscreen]):not(:has(:fullscreen)) > #columns > [data-btx-layout-width="primary"] {
+    box-sizing:border-box !important; flex:1 1 0% !important;
+    width:auto !important; inline-size:auto !important; max-width:none !important; max-inline-size:none !important;
+    min-width:0 !important; min-inline-size:0 !important; margin-inline:0 !important; padding-inline:0 !important;
+  }
+  ytd-watch-flexy[data-btx-layout-width="watch"]:not([theater]):not([fullscreen]):not(:has(:fullscreen)) > #columns > #primary > [data-btx-layout-width="primary-inner"] {
+    box-sizing:border-box !important; width:100% !important; inline-size:100% !important;
+    max-width:none !important; max-inline-size:none !important; min-width:0 !important; min-inline-size:0 !important;
+    margin-inline:0 !important; padding-inline:0 !important;
+  }
+  ytd-watch-flexy[data-btx-layout-width="watch"]:not([theater]):not([fullscreen]):not(:has(:fullscreen)) > #columns > [data-btx-layout-width="secondary"] {
+    flex-grow:0 !important; margin-inline:0 !important; padding-inline:0 !important;
+  }
+}
+
+#btx-youtube-tabs {
+  --btx-surface: var(--yt-spec-base-background, #fff);
+  --btx-soft: var(--yt-spec-badge-chip-background, #f2f2f2);
+  --btx-text: var(--yt-spec-text-primary, #161616);
+  --btx-muted: var(--yt-spec-text-secondary, #606060);
+  --btx-border: var(--yt-spec-10-percent-layer, #dedede);
+  width:100%; min-width:0; box-sizing:border-box; margin:0 0 16px;
+  border:1px solid var(--btx-border); border-radius:12px; background:var(--btx-surface);
+  color:var(--btx-text); font:400 14px/1.6 Roboto, "YouTube Sans", Arial, sans-serif;
+}
+html[dark] #btx-youtube-tabs { --btx-surface:var(--yt-spec-base-background,#0f0f0f); --btx-soft:var(--yt-spec-badge-chip-background,#272727); --btx-text:var(--yt-spec-text-primary,#f1f1f1); --btx-muted:var(--yt-spec-text-secondary,#aaa); --btx-border:var(--yt-spec-10-percent-layer,#333); }
+#btx-youtube-tabs > .btx-tabs-header,
+#btx-youtube-tabs > .btx-tabs-header > button,
+#btx-youtube-tabs > .btx-tabs-body,
+#btx-youtube-tabs > .btx-tabs-body > .btx-tab-pane { box-sizing:border-box; }
+#btx-youtube-tabs > .btx-tabs-header { display:flex; align-items:stretch; gap:4px; padding:0 8px; border-bottom:1px solid var(--btx-border); border-radius:12px 12px 0 0; }
+#btx-youtube-tabs > .btx-tabs-header > button { position:relative; flex:1 1 0; min-width:0; min-height:48px; display:flex; align-items:center; justify-content:center; gap:8px; padding:12px 8px; border:0; border-radius:0; background:transparent; color:var(--btx-muted); font:500 13px/1.4 Roboto,Arial,sans-serif; cursor:pointer; white-space:nowrap; }
+#btx-youtube-tabs > .btx-tabs-header > button:not([aria-disabled="true"]):hover { color:var(--btx-text); }
+#btx-youtube-tabs > .btx-tabs-header > button[aria-selected="true"] { color:var(--btx-text); font-weight:700; }
+#btx-youtube-tabs > .btx-tabs-header > button[aria-selected="true"]::after { content:""; position:absolute; height:2px; background:currentColor; border-radius:2px; inset-inline:12px; bottom:-1px; }
+#btx-youtube-tabs > .btx-tabs-header > button[aria-disabled="true"] { opacity:.6; cursor:default; }
+#btx-youtube-tabs > .btx-tabs-header > button:focus-visible,
+#btx-youtube-tabs > .btx-tabs-body > .btx-tab-pane:focus-visible { outline:2px solid #3ea6ff; outline-offset:-3px; border-radius:6px; }
+#btx-youtube-tabs .btx-tabs-label { overflow:hidden; text-overflow:ellipsis; }
+#btx-youtube-tabs .btx-tabs-icon { width:16px; height:16px; flex:none; pointer-events:none; }
+#btx-youtube-tabs > .btx-tabs-body > .btx-tab-pane { padding:18px; min-width:0; overflow-wrap:anywhere; }
+#btx-youtube-tabs > .btx-tabs-header > button[hidden],
+#btx-youtube-tabs .btx-tab-pane[hidden], #btx-youtube-tabs > .btx-tabs-body[hidden], #btx-youtube-tabs > .btx-native-note[hidden], #btx-youtube-tabs > .btx-layout-status[hidden] { display:none !important; }
+#btx-youtube-tabs > .btx-native-note, #btx-youtube-tabs > .btx-layout-status { margin:0; padding:12px 18px; color:var(--btx-muted); font:400 12px/1.6 Roboto,Arial,sans-serif; overflow-wrap:anywhere; white-space:pre-line; }
+#btx-youtube-tabs > .btx-layout-status { border-top:1px solid var(--btx-border); }
+#btx-youtube-tabs[data-scroll="true"] > .btx-tabs-body > .btx-tab-pane { max-height:var(--btx-pane-height,calc(100dvh - 184px)); overflow:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--btx-muted) transparent; }
+#btx-youtube-tabs .btx-tab-pane > [data-btx-layout-owned] { margin-top:0 !important; margin-bottom:0 !important; max-width:100%; min-width:0; }
+/* Flatten the native description card only while it is in our information pane.
+   Removing the feature removes the selector match, restoring the site's styling. */
+#btx-youtube-tabs #btx-pane-info > [data-btx-layout-owned="info"],
+#btx-youtube-tabs #btx-pane-info > [data-btx-layout-owned="info"] > #description-inner {
+  background:transparent !important; box-shadow:none !important; border:0 !important; border-radius:0 !important;
+  padding:0 !important; margin:0 !important; width:auto !important; max-width:100%;
+  font-size:14px; line-height:1.65; font-weight:400;
+}
+#btx-youtube-tabs #btx-pane-info ytd-text-inline-expander { font-size:14px; line-height:1.65; font-weight:400; }
+#btx-youtube-tabs #btx-pane-comments ytd-comments-header-renderer { margin-top:0 !important; padding-top:0 !important; }
+#btx-youtube-tabs #btx-pane-videos > [data-btx-layout-owned="videos"] { width:100% !important; }
+#btx-youtube-tabs #btx-pane-videos ytd-watch-next-secondary-results-renderer { min-width:0; max-width:100%; }
+#btx-youtube-tabs[data-orphan="true"] > .btx-tabs-body { display:block !important; }
+#btx-youtube-tabs[data-orphan="true"] .btx-tab-pane { display:block !important; }
+@media (max-width:980px) {
+  #btx-youtube-tabs { margin-top:12px; }
+  #btx-youtube-tabs > .btx-tabs-body > .btx-tab-pane { padding:16px; }
+  #btx-youtube-tabs[data-scroll="true"] > .btx-tabs-body > .btx-tab-pane { max-height:min(var(--btx-pane-height,65dvh),65dvh); }
+}
+/* Expand real text on hover/focus, without removing subscription/action buttons. */
+[data-btx-channel-name] #owner #upload-info:hover,
+[data-btx-channel-name] #owner #upload-info:focus-within { min-width:0 !important; max-width:100% !important; }
+[data-btx-channel-name] #owner #upload-info:is(:hover,:focus-within) #channel-name,
+[data-btx-channel-name] #owner #upload-info:is(:hover,:focus-within) #channel-name #text,
+[data-btx-channel-name] #owner #upload-info:is(:hover,:focus-within) #channel-name a {
+  white-space:normal !important; overflow:visible !important; text-overflow:clip !important; max-width:none !important; overflow-wrap:anywhere;
+}
+
+/* Native playlist, moved as one tree. Keep its header, item links and controls;
+   do not rewrite YouTube's collapsed/selected state or clone its entries. */
+#btx-youtube-tabs > .btx-tabs-body > #btx-pane-playlist { padding:0; border-radius:0 0 11px 11px; }
+#btx-youtube-tabs #btx-pane-playlist > [data-btx-layout-owned="playlist"],
+#btx-youtube-tabs #btx-pane-playlist > [data-btx-layout-owned="playlist"] > #container {
+  box-sizing:border-box; width:100%; min-width:0; margin:0 !important;
+  border:0 !important; border-radius:0 !important; box-shadow:none !important;
+}
+/* For the verified header/items structure, use the existing #items scroller
+   instead of a second full-height scroll area below the extension panel.
+   In other structures the ordinary pane scroller still contains all content. */
+#btx-youtube-tabs[data-scroll="true"] #btx-pane-playlist > [data-btx-layout-owned="playlist"]:not([hidden]):not([aria-hidden="true"]):has(> #container > #items),
+#btx-youtube-tabs[data-scroll="true"] #btx-pane-playlist > [data-btx-layout-owned="playlist"] > #container:not([hidden]):not([aria-hidden="true"]):has(> #items) {
+  display:flex; flex-direction:column; min-height:0; max-height:inherit;
+}
+#btx-youtube-tabs[data-scroll="true"] #btx-pane-playlist > [data-btx-layout-owned="playlist"] > #container > :not(#items) { flex-shrink:0; }
+#btx-youtube-tabs[data-scroll="true"] #btx-pane-playlist > [data-btx-layout-owned="playlist"] > #container > #items {
+  flex:0 1 auto; min-height:0 !important; max-height:none !important;
+  overflow-y:auto; overscroll-behavior-y:contain; scrollbar-width:thin;
+}
