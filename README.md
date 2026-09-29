@@ -118,9 +118,7 @@ pnpm test:all
 pnpm run pack
 ```
 
-`pnpm run pack`은 타입 검사와 빌드 후 명시된 실행 파일만 `release/browser-toolbox-2.0.0.zip`에 담습니다. 테스트·로그·분석 자료·소스·의존성은 제외합니다. 버전과 참조 파일을 확인하고 ZIP 및 파일별 SHA-256을 함께 생성합니다. 동일한 소스로 만든 ZIP의 내용과 해시는 재현됩니다. GitHub Actions 설정도 같은 검증·패키징 명령을 실행합니다.
-
-개발 폴더의 `docs/FULL_AUDIT_1.77.4.ko.md`는 여백 재발 원인, 전체 코드 검토, 추가 오류와 검증 범위를 기록합니다. `docs/YOUTUBE_QUALITY_FIX_1.77.3.ko.md`는 선호 화질 대기 오류와 팝업 적용 경로 검증을, `docs/MEDIA_RUNTIME_FIX_1.77.2.ko.md`는 세션 통신 오류 재현과 복구 검증을, `docs/POPUP_FIX_1.77.1.ko.md`는 팝업 오류 수정을, `docs/IMPROVEMENTS.ko.md`는 1.77.0 개선 범위를, `analysis/2026-09-29`는 개선 전 1.76.0 분석을 보관합니다.
+`pnpm run pack`은 타입 검사와 빌드 후 명시된 실행 파일만 `release/browser-toolbox-2.0.0.zip`에 담습니다. 테스트·로그·분석 자료·소스·의존성은 제외합니다. 버전과 참조 파일을 확인하고 ZIP 및 파일별 SHA-256을 함께 생성합니다. 동일한 소스로 만든 ZIP의 내용과 해시는 재현됩니다.
 
 ## 타사 고지
 
