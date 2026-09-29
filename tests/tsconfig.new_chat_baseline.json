@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.baseline.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../.test_new_chat_baseline"
+  },
+  "include": [
+    "fixtures/legacy_new_chat_width.ts",
+    "fixtures/legacy_globals.d.ts"
+  ]
+}

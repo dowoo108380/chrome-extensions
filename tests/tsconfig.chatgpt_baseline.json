@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.baseline.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../.test_chatgpt_baseline"
+  },
+  "include": [
+    "fixtures/legacy_chatgpt_width.ts",
+    "fixtures/legacy_chatgpt_identifiers.ts",
+    "fixtures/legacy_globals.d.ts"
+  ]
+}

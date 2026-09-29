@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.baseline.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "outDir": "../.test_layout_baseline"
+  },
+  "include": [
+    "fixtures/legacy_globals.d.ts",
+    "../src/toolbox_shared.ts",
+    "fixtures/legacy_youtube_layout.ts"
+  ]
+}

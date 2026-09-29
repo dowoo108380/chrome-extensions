@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.baseline.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "outDir": "../.test_scroll_baseline",
+    "noEmit": false
+  },
+  "include": [
+    "fixtures/legacy_globals.d.ts",
+    "../src/toolbox_shared.ts",
+    "fixtures/legacy_scroll_layout.ts"
+  ]
+}

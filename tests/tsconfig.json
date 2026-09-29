@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "commonjs", "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "rootDir": ".", "outDir": "../.test_dist", "strict": true, "noEmitOnError": true, "skipLibCheck": true, "types": []
+  },
+  "include": ["*.ts"]
+}

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.baseline.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "outDir": "../.test_transition_baseline"
+  },
+  "include": [
+    "fixtures/legacy_transition_layout.ts",
+    "fixtures/legacy_globals.d.ts",
+    "../src/toolbox_shared.ts"
+  ]
+}

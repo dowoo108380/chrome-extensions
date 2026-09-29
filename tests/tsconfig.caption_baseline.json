@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.baseline.json",
+  "compilerOptions": {
+    "rootDir": "fixtures",
+    "outDir": "../.test_dist/caption_baseline"
+  },
+  "include": [
+    "fixtures/legacy_globals.d.ts",
+    "fixtures/legacy_caption_page_task.ts"
+  ]
+}
