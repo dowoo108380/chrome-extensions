@@ -61,6 +61,39 @@ try:
   if args.smoke:
    b.close();REPORT['passed']=True
   else:
+   # The native reader is registered before the extension, and reads real DOM
+   # attributes on trusted hover/focus. No quality automation is enabled here.
+   for name,value,language,expected in [('null','null','ko','설정'),('undefined','undefined','ko-KR','설정'),('empty','','ko','설정'),('missing',None,'ko','설정'),('english','null','en-US','Settings')]:
+    p=fixture(b,enable=False);gear=p.locator('.ytp-settings-button')
+    p.locator('html').evaluate('(e,lang)=>e.lang=lang',language)
+    gear.evaluate('''(b,value)=>{b.setAttribute('data-tooltip-target-id','ytp-settings-button');
+      for(const attr of ['aria-label','data-tooltip-title']){if(value===null)b.removeAttribute(attr);else b.setAttribute(attr,value)}}''',value)
+    gear.hover();assert p.locator('.ytp-tooltip-text').inner_text()==expected
+    assert gear.get_attribute('aria-label')==expected and gear.get_attribute('title') is None
+    assert p.evaluate('__qualityFixture.gearCalls')==0 and st(p)['state']=='off'
+    emit('settings_tooltip_'+name+'_repaired_before_native_hover');p.close()
+   p=fixture(b,enable=False);gear=p.locator('.ytp-settings-button')
+   gear.evaluate('(b)=>{b.setAttribute("aria-label","null");b.setAttribute("data-tooltip-title","null")}')
+   gear.focus();assert p.locator('.ytp-tooltip-text').inner_text()=='설정';assert gear.get_attribute('aria-label')=='설정'
+   emit('settings_tooltip_keyboard_focus_repaired');p.close()
+   for attr in ['data-tooltip-title','data-title-no-tooltip','title']:
+    p=fixture(b,{'tooltipAttribute':attr},enable=False);gear=p.locator('.ytp-settings-button')
+    gear.evaluate('(b,a)=>{b.setAttribute(a,"null");b.setAttribute("aria-label","Einstellungen (8K)")}',attr)
+    gear.hover();assert p.locator('.ytp-tooltip-text').inner_text()=='Einstellungen (8K)'
+    assert gear.get_attribute('aria-label')=='Einstellungen (8K)';emit('settings_tooltip_reuses_native_label_'+attr);p.close()
+   p=fixture(b,enable=False);gear=p.locator('.ytp-settings-button')
+   gear.evaluate('(b)=>{b.setAttribute("data-tooltip-title","Settings (8K)");b.setAttribute("aria-label","Settings");b.title=""}')
+   before=gear.evaluate('(b)=>b.outerHTML');gear.hover();gear.focus()
+   assert gear.evaluate('(b)=>b.outerHTML')==before;assert p.locator('.ytp-tooltip-text').inner_text()=='Settings (8K)'
+   p.locator('#outside').evaluate('(b)=>{b.classList.add("ytp-settings-button");b.setAttribute("data-tooltip-title","null");b.setAttribute("aria-label","null")}')
+   p.locator('#outside').hover();p.locator('#outside').focus();assert p.locator('#outside').get_attribute('data-tooltip-title')=='null'
+   emit('valid_settings_labels_and_buttons_outside_player_are_untouched');p.close()
+   p=fixture(b,enable=False);gear=p.locator('.ytp-settings-button')
+   gear.evaluate('(b)=>{b.setAttribute("data-tooltip-title","null");b.setAttribute("aria-label","null")}');gear.hover()
+   p.locator('#outside').hover();p.evaluate('__qualityFixture.next("tooltip_next")')
+   gear.evaluate('(b)=>{const n=b.cloneNode(true);n.setAttribute("data-tooltip-title","null");n.setAttribute("aria-label","null");const s=document.createElement("span");s.textContent="⚙";n.replaceChildren(s);b.replaceWith(n)}')
+   gear.locator('span').hover();assert p.locator('.ytp-tooltip-text').inner_text()=='설정';assert gear.get_attribute('aria-label')=='설정'
+   assert p.evaluate('__qualityFixture.gearCalls')==0;emit('settings_tooltip_survives_spa_button_replacement_and_nested_target');p.close()
    # Actual desktop YouTube was observed with aria-label="null" and modern
    # nested controls. Accessible labels are not a prerequisite for native UI.
    for name,label in [('literal_null','null'),('empty',''),('missing',None),('decorated','Settings (8K)')]:

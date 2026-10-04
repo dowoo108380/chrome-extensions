@@ -1,4 +1,5 @@
-/** Select an actual native quality menu item. No private player API, network replay,
+/** Repair invalid settings-button labels and select an actual native quality menu item.
+ * No private player API, network replay,
  * stream replacement, entitlement guessing, CSS hiding of menus, or quality lock. */
 (() => {
   "use strict";
@@ -78,6 +79,27 @@
     // native Quality row, panel and checked radio item before reporting success.
     return unique([...player.querySelectorAll<HTMLButtonElement>("button.ytp-settings-button")].filter(b =>
       visible(b) && !b.matches(":disabled,[disabled],[aria-disabled=true]")), "설정 버튼을 하나로 확정하지 못했습니다.");
+  }
+  function validSettingsLabel(value: string | null): value is string {
+    return value !== null && value.trim() !== "" && !/^(null|undefined)$/i.test(value.trim());
+  }
+  function repairSettingsLabel(event: Event): void {
+    const gear = event.target instanceof Element
+      ? event.target.closest<HTMLButtonElement>("#movie_player button.ytp-settings-button") : null;
+    if (!gear) return;
+    const attributes = ["data-tooltip-title", "data-title-no-tooltip", "aria-label", "title"] as const;
+    const language = document.documentElement.lang || navigator.language;
+    const label = attributes.map(name => gear.getAttribute(name)).find(validSettingsLabel)
+      ?? (/^ko(?:-|$)/i.test(language) ? "설정" : "Settings");
+    for (const name of attributes) {
+      const value = gear.getAttribute(name);
+      // Preserve native names and a deliberately empty title (avoids a second,
+      // browser-owned tooltip). Only modern controls need data-tooltip-title.
+      const needed = name === "aria-label" ||
+        (name === "data-tooltip-title" && gear.hasAttribute("data-tooltip-target-id")) ||
+        (value !== null && (name !== "title" || value.trim() !== ""));
+      if (needed && !validSettingsLabel(value)) gear.setAttribute(name, label);
+    }
   }
   function qualityPanel(player: HTMLElement, includeHidden = false): HTMLElement | null {
     const panels = [...player.querySelectorAll<HTMLElement>(".ytp-settings-menu .ytp-panel")].filter(panel => {
@@ -408,5 +430,8 @@
   });
   window.addEventListener("pagehide", () => { pageHidden = true; disableEvents(); });
   window.addEventListener("pageshow", e => { if (e.persisted || pageHidden) { pageHidden = false; navigating = false; void readSettings(); } });
+  // Repair the public label attributes before native tooltip handlers read them.
+  // Delegation also covers SPA-replaced controls, independently of quality settings.
+  for (const type of ["pointerover", "mouseover", "focus"]) document.addEventListener(type, repairSettingsLabel, true);
   void readSettings();
 })();

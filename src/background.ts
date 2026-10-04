@@ -1302,9 +1302,9 @@ async function detachExtensionDebugger(tabId: number): Promise<void> {
     if (!isDebuggerNotAttachedError(error) && !isDebuggerTargetUnavailableError(error)) {
       throw error;
     }
-  } finally {
-    extensionAttachedDebuggerTabs.delete(tabId);
   }
+  // Keep ownership when an unexpected failure leaves the connection uncertain.
+  extensionAttachedDebuggerTabs.delete(tabId);
 }
 
 async function ensureExtensionDebuggerAttached(tabId: number): Promise<boolean> {

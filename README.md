@@ -1,4 +1,4 @@
-# Browser Toolbox 2.0.0
+# Browser Toolbox 2.0.2
 
 ChatGPT 입력 도구, HTML5 미디어 제어, YouTube 보조 기능, 캡처와 페이지 도구를 제공하는 Chrome Manifest V3 확장 프로그램입니다. Chrome 133 이상을 대상으로 합니다. 실행 시 외부 패키지나 원격 코드를 불러오지 않습니다.
 
@@ -118,7 +118,7 @@ pnpm test:all
 pnpm run pack
 ```
 
-`pnpm run pack`은 타입 검사와 빌드 후 명시된 실행 파일만 `release/browser-toolbox-2.0.0.zip`에 담습니다. 테스트·로그·분석 자료·소스·의존성은 제외합니다. 버전과 참조 파일을 확인하고 ZIP 및 파일별 SHA-256을 함께 생성합니다. 동일한 소스로 만든 ZIP의 내용과 해시는 재현됩니다.
+`pnpm run pack`은 타입 검사와 빌드 후 명시된 실행 파일만 `release/browser-toolbox-2.0.2.zip`에 담습니다. 테스트·로그·분석 자료·소스·의존성은 제외합니다. 버전과 참조 파일을 확인하고 ZIP 및 파일별 SHA-256을 함께 생성합니다. 동일한 소스로 만든 ZIP의 내용과 해시는 재현됩니다.
 
 ## 타사 고지
 

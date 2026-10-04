@@ -120,6 +120,19 @@ async function verifySelectionDocument(tabId, documentId) {
         throw captureDocumentChanged();
     }
 }
+async function releaseCaptureDebugger(tabId, downloadStarted, captureError) {
+    if (await shouldKeepDebuggerAttachedAfterTemporaryOperation(tabId))
+        return;
+    try {
+        await detachExtensionDebugger(tabId);
+    }
+    catch (error) {
+        const resultMessage = downloadStarted
+            ? "이미지 다운로드는 시작했습니다. "
+            : captureError ? `${makeUserMessage(captureError, "화면 캡처에 실패했습니다.")} ` : "";
+        throw new Error(`${resultMessage}캡처 후 디버거 연결을 해제하지 못했습니다. 탭에 디버거 연결이 남아 있을 수 있습니다.`, { cause: error });
+    }
+}
 async function captureFullPage(tabId) {
     const tab = await getTab(tabId);
     validateTab(tab);
@@ -129,9 +142,11 @@ async function captureFullPage(tabId) {
     const navigation = watchCaptureNavigation(tab);
     capturingTabs.add(tab.id);
     try {
-        return await queueTabDebuggerOperation(tab.id, async () => {
+        const result = await queueTabDebuggerOperation(tab.id, async () => {
             const target = { tabId: tab.id };
             let debuggerReady = false;
+            let downloadStarted = false;
+            let captureError;
             try {
                 navigation.assertCurrent();
                 await setBadge(tab.id, "...", "#2563eb");
@@ -164,15 +179,21 @@ async function captureFullPage(tabId) {
                 await verifyCaptureFrame(target, tab.url, frame);
                 navigation.assertCurrent();
                 const saved = await saveScreenshot(screenshot.data, "full_page_screenshots", tab.url);
-                await setBadge(tab.id, "OK", "#15803d", BADGE_CLEAR_DELAY_MS);
+                downloadStarted = true;
                 return { ...saved, width, height };
             }
+            catch (error) {
+                captureError = error;
+                throw error;
+            }
             finally {
-                if (debuggerReady && !await shouldKeepDebuggerAttachedAfterTemporaryOperation(tab.id)) {
-                    await detachExtensionDebugger(tab.id).catch(() => { });
+                if (debuggerReady) {
+                    await releaseCaptureDebugger(tab.id, downloadStarted, captureError);
                 }
             }
         });
+        await setBadge(tab.id, "OK", "#15803d", BADGE_CLEAR_DELAY_MS);
+        return result;
     }
     finally {
         navigation.dispose();
@@ -187,9 +208,11 @@ async function captureSelection(tab, rectangle, documentId) {
     const navigation = watchCaptureNavigation(tab);
     capturingTabs.add(tab.id);
     try {
-        return await queueTabDebuggerOperation(tab.id, async () => {
+        const result = await queueTabDebuggerOperation(tab.id, async () => {
             const target = { tabId: tab.id };
             let debuggerReady = false;
+            let downloadStarted = false;
+            let captureError;
             try {
                 navigation.assertCurrent();
                 await verifySelectionDocument(tab.id, documentId);
@@ -219,15 +242,21 @@ async function captureSelection(tab, rectangle, documentId) {
                 await verifyCaptureFrame(target, tab.url, frame);
                 navigation.assertCurrent();
                 const saved = await saveScreenshot(screenshot.data, "selected_area_screenshots", tab.url);
-                await setBadge(tab.id, "OK", "#15803d", BADGE_CLEAR_DELAY_MS);
+                downloadStarted = true;
                 return { ok: true, ...saved, clip };
             }
+            catch (error) {
+                captureError = error;
+                throw error;
+            }
             finally {
-                if (debuggerReady && !await shouldKeepDebuggerAttachedAfterTemporaryOperation(tab.id)) {
-                    await detachExtensionDebugger(tab.id).catch(() => { });
+                if (debuggerReady) {
+                    await releaseCaptureDebugger(tab.id, downloadStarted, captureError);
                 }
             }
         });
+        await setBadge(tab.id, "OK", "#15803d", BADGE_CLEAR_DELAY_MS);
+        return result;
     }
     finally {
         navigation.dispose();

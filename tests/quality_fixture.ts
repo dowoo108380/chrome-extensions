@@ -13,6 +13,20 @@
   function element<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""): HTMLElementTagNameMap[K] {
     const el = document.createElement(tag); el.className = cls; el.textContent = text; return el;
   }
+  // Model native tooltip reads in the page world, after document capture listeners.
+  // Deliberately stringify a missing attribute too, reproducing the visible "null".
+  const tooltip = element("div", "ytp-tooltip");
+  const tooltipText = element("span", "ytp-tooltip-text");
+  tooltip.append(tooltipText); tooltip.hidden = true;
+  tooltip.style.cssText = "position:absolute;right:16px;bottom:60px;pointer-events:none";
+  player.append(tooltip);
+  for (const type of ["mouseover", "focus"]) player.addEventListener(type, event => {
+    const button = event.target instanceof Element ? event.target.closest("button.ytp-settings-button") : null;
+    if (!button) return;
+    const attribute = state.tooltipAttribute || "data-tooltip-title";
+    tooltipText.textContent = String(button.getAttribute(attribute)); tooltip.hidden = false;
+  }, true);
+  for (const type of ["mouseout", "blur"]) player.addEventListener(type, () => { tooltip.hidden = true; }, true);
   function open(show: boolean): void { menu.hidden = !show; menu.removeAttribute("aria-hidden"); gear.setAttribute("aria-expanded", String(show)); }
   function panel(title: string): HTMLElement {
     const p = element("div", "ytp-panel"); const header = element("div", "ytp-panel-header");

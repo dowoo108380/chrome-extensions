@@ -1089,9 +1089,8 @@ async function detachExtensionDebugger(tabId) {
             throw error;
         }
     }
-    finally {
-        extensionAttachedDebuggerTabs.delete(tabId);
-    }
+    // Keep ownership when an unexpected failure leaves the connection uncertain.
+    extensionAttachedDebuggerTabs.delete(tabId);
 }
 async function ensureExtensionDebuggerAttached(tabId) {
     const target = { tabId };

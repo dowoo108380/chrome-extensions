@@ -74,7 +74,10 @@
     // would also affect legacy forms/previous-message editors.
     const WIDTH_REPORTED_SCROLL = '[role="presentation"].overflow-y-auto.flex-col-reverse';
     const WIDTH_REPORTED_EDITOR = `.ProseMirror[role="textbox"]${WIDTH_SAFE_SCOPE}`;
-    const WIDTH_REPORTED_BOX = `${WIDTH_MODERN_BOX}.mx-auto.w-full.px-toolbar`;
+    // The live 2026-10-04 layout replaced px-toolbar with variable inline padding.
+    // Both remain real width carriers; retain the lane/form constraints below.
+    const WIDTH_REPORTED_PADDING = ':is(.px-toolbar, [class~="px-[var(--thread-body-inline-padding,var(--padding-toolbar))]"])';
+    const WIDTH_REPORTED_BOX = `${WIDTH_MODERN_BOX}.mx-auto.w-full${WIDTH_REPORTED_PADDING}`;
     const WIDTH_REPORTED_CONVERSATION = `${WIDTH_REPORTED_SCROLL}${WIDTH_SAFE_SCOPE}:has(> .absolute > ${WIDTH_REPORTED_BOX} form ${WIDTH_REPORTED_EDITOR}) > .min-h-full.flex-col.overflow-x-clip > ${WIDTH_REPORTED_BOX}${WIDTH_SAFE_SCOPE}`;
     const WIDTH_REPORTED_COMPOSER = `${WIDTH_REPORTED_SCROLL}${WIDTH_SAFE_SCOPE} > .absolute > ${WIDTH_REPORTED_BOX}:has(form ${WIDTH_REPORTED_EDITOR})${WIDTH_NOT_EDIT}${WIDTH_SAFE_SCOPE}`;
     // User-provided 1.67.0 NEW-CHAT report: the form is in the centered landing
@@ -383,7 +386,7 @@ ${buildSharedWidthCss()}
         });
         return {
             ok: true, scope: 'chatgpt-width-structure', schemaVersion: 1,
-            contentScriptRevision: '1.74.0', extensionVersion: globalThis.chrome?.runtime?.getManifest?.().version || null,
+            contentScriptRevision: '2.0.2', extensionVersion: globalThis.chrome?.runtime?.getManifest?.().version || null,
             configured: { conversation: chatConversationWidthPx, composer: chatComposerWidthPx },
             document: { readyState: document.readyState, viewportWidth: document.documentElement.clientWidth,
                 viewportHeight: document.documentElement.clientHeight,

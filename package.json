@@ -1,6 +1,6 @@
 {
   "name": "browser-toolbox-extension",
-  "version": "2.0.0",
+  "version": "2.0.2",
   "private": true,
   "description": "TypeScript source for the Browser Toolbox Chrome extension.",
   "scripts": {
@@ -22,6 +22,7 @@
     "test:playlist": "node scripts/test.mjs playlist",
     "test:theater": "node scripts/test.mjs theater",
     "test:popup": "node scripts/test.mjs popup",
+    "test:popup-settings": "node scripts/test.mjs popup-settings",
     "test:quality": "node scripts/test.mjs quality",
     "test:width": "node scripts/test.mjs width",
     "test:readiness": "node scripts/test.mjs readiness",

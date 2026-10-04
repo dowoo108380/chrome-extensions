@@ -9,7 +9,7 @@ const aliases = {
   browser: ['browser_tests'], captions: ['caption_security_tests', 'caption_lifecycle_tests'], live: ['live_chat_tests'],
   youtube: ['youtube_tools_tests'], description: ['description_tests'], 'info-hover': ['info_hover_tests'], layout: ['layout_regressions'], scroll: ['scroll_regressions'],
   ambient: ['ambient_scroll_tests'], playlist: ['playlist_tests'], theater: ['theater_tests'],
-  popup: ['popup_navigation_tests'], quality: ['quality_tests', 'quality_popup_tests'],
+  popup: ['popup_navigation_tests', 'popup_settings_tests'], 'popup-settings': ['popup_settings_tests'], quality: ['quality_tests', 'quality_popup_tests'],
   width: ['width_tests'], readiness: ['width_readiness_tests'], chatgpt: ['chatgpt_width_tests'],
   'chatgpt-diagnostics': ['chatgpt_diagnostics_tests'], 'chatgpt-structure': ['chatgpt_structure_tests'],
   lifecycle: ['layout_lifecycle_tests'], review: ['review_regressions'],

@@ -116,6 +116,19 @@ try:
                 wait_until(control, lambda: not popup_read('w.document.getElementById("youtube-quality-height").disabled'), 'Popup save did not finish')
 
             assert status()['state'] == 'off'
+            page.locator('.ytp-settings-button').hover()
+            assert page.locator('.ytp-tooltip').is_visible()
+            assert page.locator('.ytp-tooltip-text').inner_text() == '설정'
+            assert page.locator('.ytp-settings-button').get_attribute('aria-label') == '설정'
+            assert page.locator('.ytp-settings-button').get_attribute('title') is None
+            assert page.evaluate('__qualityFixture.gearCalls') == 0
+            record('installed_extension_repairs_null_tooltip_with_quality_disabled')
+            # Keep the existing automation regression: quality selection must
+            # also work before the user ever hovers a newly broken native label.
+            page.mouse.move(0, 0)
+            page.locator('.ytp-settings-button').evaluate('''b=>{
+                b.setAttribute('aria-label','null');b.setAttribute('data-tooltip-title','null');
+            }''')
             popup = open_popup()
             popup_click('#nav-youtube')
             popup_click('#youtube-quality-height')
@@ -136,6 +149,10 @@ try:
             record('real_popup_status_separates_verified_menu_from_decoded_dimensions', text)
             close_popup()
 
+            page.locator('.ytp-settings-button').hover()
+            assert page.locator('.ytp-tooltip').is_visible()
+            assert page.locator('.ytp-tooltip-text').inner_text() == '설정'
+            record('settings_tooltip_remains_valid_after_automatic_quality_selection')
             page.locator('#next-video').click()
             page.wait_for_url('**?v=quality_next_1')
             record('next_video_in_same_document_uses_saved_preference_and_available_fallback', selected('2160p 4K'))

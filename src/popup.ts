@@ -221,10 +221,8 @@
   let tabKeepActiveStateAvailable = false;
   let tabEntries: TabEntry[] = [];
   let copyLabelResetTimer = 0;
-  let chatWidthSaveTimer = 0;
-  let composerWidthSaveTimer = 0;
-  let pendingChatWidthPx = CHAT_WIDTH_DEFAULT_PX;
-  let pendingComposerWidthPx = COMPOSER_WIDTH_DEFAULT_PX;
+  const chatWidthSetting = createWidthSetting(CHAT_WIDTH_STORAGE_KEY, "대화", normalizeChatWidthPx, updateChatWidthUi);
+  const composerWidthSetting = createWidthSetting(COMPOSER_WIDTH_STORAGE_KEY, "입력란", normalizeComposerWidthPx, updateComposerWidthUi);
   let mediaRateSaveTimer = 0;
   let pendingMediaRate = 1;
   let activeMediaTabId: number | null = null;
@@ -343,7 +341,6 @@
 
   function updateChatWidthUi(widthPx: unknown) {
     const normalizedWidth = normalizeChatWidthPx(widthPx);
-    pendingChatWidthPx = normalizedWidth;
     chatWidthSlider.max = String(CHAT_WIDTH_SLIDER_MAX);
     chatWidthSlider.value = String(widthToSliderValue(normalizedWidth));
     chatWidthValue.textContent = formatChatWidth(normalizedWidth);
@@ -352,7 +349,6 @@
 
   function updateComposerWidthUi(widthPx: unknown) {
     const normalizedWidth = normalizeComposerWidthPx(widthPx);
-    pendingComposerWidthPx = normalizedWidth;
     composerWidthSlider.max = String(CHAT_WIDTH_SLIDER_MAX);
     composerWidthSlider.value = String(widthToSliderValue(normalizedWidth));
     composerWidthValue.textContent = formatChatWidth(normalizedWidth);
@@ -644,8 +640,8 @@
     const storedComposerWidth = Object.prototype.hasOwnProperty.call(stored, COMPOSER_WIDTH_STORAGE_KEY)
       ? stored[COMPOSER_WIDTH_STORAGE_KEY]
       : COMPOSER_WIDTH_DEFAULT_PX;
-    updateChatWidthUi(storedChatWidth);
-    updateComposerWidthUi(storedComposerWidth);
+    chatWidthSetting.applyStored(storedChatWidth);
+    composerWidthSetting.applyStored(storedComposerWidth);
 
     updateMediaRateUi(pendingMediaRate);
     updateMediaSpeedStepUi(
@@ -689,13 +685,13 @@
     return globalThis.chrome?.runtime?.lastError?.message || "";
   }
 
-  function loadSettings() {
+  function loadSettings({ preserveStatus = false }: { preserveStatus?: boolean } = {}) {
     const generation = ++settingsReadGeneration;
     const revision = settingsJournal.mark();
     if (!storageArea || typeof storageArea.get !== "function") {
       applySettings(DEFAULT_SETTINGS);
       setControlsEnabled(false);
-      setSettingsStatus("Chrome 저장소를 사용할 수 없습니다.", "error");
+      if (!preserveStatus) setSettingsStatus("Chrome 저장소를 사용할 수 없습니다.", "error");
       return;
     }
 
@@ -705,7 +701,7 @@
         if (getRuntimeErrorMessage()) {
           applySettings(settingsJournal.merge(DEFAULT_SETTINGS, revision));
           setControlsEnabled(false);
-          setSettingsStatus("설정을 불러오지 못했습니다.", "error");
+          if (!preserveStatus) setSettingsStatus("설정을 불러오지 못했습니다.", "error");
           return;
         }
 
@@ -713,7 +709,9 @@
         applySettings(currentSettings);
         persistLegacyCopySetting(currentSettings);
         setControlsEnabled(true);
-        setSettingsStatus("설정을 불러왔습니다. ChatGPT 너비와 공통 미디어 설정은 열려 있는 페이지에 즉시 적용됩니다.");
+        if (!preserveStatus) {
+          setSettingsStatus("설정을 불러왔습니다. ChatGPT 너비와 공통 미디어 설정은 열려 있는 페이지에 즉시 적용됩니다.");
+        }
         void loadActiveMediaTabState(false);
         document.documentElement.dataset.popupControlsReady = "true";
         document.dispatchEvent(new Event("browser-toolbox-popup-ready"));
@@ -721,8 +719,13 @@
     } catch {
       applySettings(DEFAULT_SETTINGS);
       setControlsEnabled(false);
-      setSettingsStatus("설정을 불러오지 못했습니다.", "error");
+      if (!preserveStatus) setSettingsStatus("설정을 불러오지 못했습니다.", "error");
     }
+  }
+
+  function reloadSettingsAfterSaveFailure(message: string) {
+    setSettingsStatus(message, "error");
+    loadSettings({ preserveStatus: true });
   }
 
   function saveSetting(key: string, value: boolean) {
@@ -736,139 +739,100 @@
     try {
       storageArea.set({ [key]: value }, () => {
         if (getRuntimeErrorMessage()) {
-          setSettingsStatus("설정을 저장하지 못했습니다.", "error");
-          loadSettings();
+          reloadSettingsAfterSaveFailure("설정을 저장하지 못했습니다.");
           return;
         }
 
         setSettingsStatus("설정이 저장되어 즉시 적용되었습니다.", "success");
       });
     } catch {
-      setSettingsStatus("설정을 저장하지 못했습니다.", "error");
-      loadSettings();
+      reloadSettingsAfterSaveFailure("설정을 저장하지 못했습니다.");
     }
   }
 
-  function persistChatWidth(widthPx: number) {
-    if (!storageArea || typeof storageArea.set !== "function") {
-      setSettingsStatus("대화 너비를 저장할 수 없습니다.", "error");
-      return;
-    }
+  function createWidthSetting(
+    storageKey: string,
+    name: "대화" | "입력란",
+    normalize: (value: unknown) => number,
+    updateUi: (value: unknown) => void
+  ) {
+    let revision = 0;
+    let completedRevision = 0;
+    let timer = 0;
+    let saveQueue: Promise<void> = Promise.resolve();
 
-    const normalizedWidth = normalizeChatWidthPx(widthPx);
-    pendingChatWidthPx = normalizedWidth;
-    setSettingsStatus("ChatGPT 대화 너비를 적용하는 중입니다.", "working");
+    return {
+      applyStored(widthPx: unknown) {
+        // Storage notifications and recovery reads must not replace a local edit.
+        if (completedRevision === revision) updateUi(widthPx);
+      },
+      save(widthPx: number, immediate = false) {
+        const requestedWidth = normalize(widthPx);
+        const requestedRevision = ++revision;
+        if (timer) window.clearTimeout(timer);
+        timer = 0;
 
-    try {
-      storageArea.set({ [CHAT_WIDTH_STORAGE_KEY]: normalizedWidth }, () => {
-        if (getRuntimeErrorMessage()) {
-          setSettingsStatus("대화 너비를 저장하지 못했습니다.", "error");
-          loadSettings();
-          return;
-        }
-
-        setSettingsStatus(
-          normalizedWidth === 0
-            ? "ChatGPT의 기본 대화 너비로 되돌렸습니다."
-            : `ChatGPT 대화 너비를 ${formatChatWidth(normalizedWidth)}로 설정했습니다.`,
-          "success"
-        );
-      });
-    } catch {
-      setSettingsStatus("대화 너비를 저장하지 못했습니다.", "error");
-      loadSettings();
-    }
-  }
-
-  function queueChatWidthSave(widthPx: number, immediate = false) {
-    pendingChatWidthPx = normalizeChatWidthPx(widthPx);
-    if (chatWidthSaveTimer) {
-      window.clearTimeout(chatWidthSaveTimer);
-      chatWidthSaveTimer = 0;
-    }
-
-    if (immediate) {
-      persistChatWidth(pendingChatWidthPx);
-      return;
-    }
-
-    chatWidthSaveTimer = window.setTimeout(() => {
-      chatWidthSaveTimer = 0;
-      persistChatWidth(pendingChatWidthPx);
-    }, 120);
+        const persist = () => {
+          timer = 0;
+          // Serialize writes and skip superseded requests before touching storage.
+          saveQueue = saveQueue.then(async () => {
+            if (requestedRevision !== revision) return;
+            setSettingsStatus(`ChatGPT ${name} 너비를 적용하는 중입니다.`, "working");
+            const errorMessage = await new Promise<string>((resolve) => {
+              if (!storageArea || typeof storageArea.set !== "function") {
+                resolve(`${name} 너비를 저장할 수 없습니다.`);
+                return;
+              }
+              try {
+                storageArea.set({ [storageKey]: requestedWidth }, () => {
+                  resolve(getRuntimeErrorMessage() ? `${name} 너비를 저장하지 못했습니다.` : "");
+                });
+              } catch {
+                resolve(`${name} 너비를 저장하지 못했습니다.`);
+              }
+            });
+            if (requestedRevision !== revision) return;
+            completedRevision = requestedRevision;
+            if (errorMessage) {
+              reloadSettingsAfterSaveFailure(errorMessage);
+              return;
+            }
+            setSettingsStatus(
+              requestedWidth === 0
+                ? `ChatGPT의 기본 ${name} 너비로 되돌렸습니다.`
+                : `ChatGPT ${name} 너비를 ${formatChatWidth(requestedWidth)}로 설정했습니다.`,
+              "success"
+            );
+          });
+        };
+        if (immediate) persist();
+        else timer = window.setTimeout(persist, 120);
+      }
+    };
   }
 
   function handleChatWidthInput() {
     const widthPx = sliderValueToWidth(chatWidthSlider.value);
     updateChatWidthUi(widthPx);
-    queueChatWidthSave(widthPx);
+    chatWidthSetting.save(widthPx);
   }
 
   function handleChatWidthChange() {
     const widthPx = sliderValueToWidth(chatWidthSlider.value);
     updateChatWidthUi(widthPx);
-    queueChatWidthSave(widthPx, true);
-  }
-
-  function persistComposerWidth(widthPx: number) {
-    if (!storageArea || typeof storageArea.set !== "function") {
-      setSettingsStatus("입력란 너비를 저장할 수 없습니다.", "error");
-      return;
-    }
-
-    const normalizedWidth = normalizeComposerWidthPx(widthPx);
-    pendingComposerWidthPx = normalizedWidth;
-    setSettingsStatus("ChatGPT 입력란 너비를 적용하는 중입니다.", "working");
-
-    try {
-      storageArea.set({ [COMPOSER_WIDTH_STORAGE_KEY]: normalizedWidth }, () => {
-        if (getRuntimeErrorMessage()) {
-          setSettingsStatus("입력란 너비를 저장하지 못했습니다.", "error");
-          loadSettings();
-          return;
-        }
-
-        setSettingsStatus(
-          normalizedWidth === 0
-            ? "ChatGPT의 기본 입력란 너비로 되돌렸습니다."
-            : `ChatGPT 입력란 너비를 ${formatChatWidth(normalizedWidth)}로 설정했습니다.`,
-          "success"
-        );
-      });
-    } catch {
-      setSettingsStatus("입력란 너비를 저장하지 못했습니다.", "error");
-      loadSettings();
-    }
-  }
-
-  function queueComposerWidthSave(widthPx: number, immediate = false) {
-    pendingComposerWidthPx = normalizeComposerWidthPx(widthPx);
-    if (composerWidthSaveTimer) {
-      window.clearTimeout(composerWidthSaveTimer);
-      composerWidthSaveTimer = 0;
-    }
-
-    if (immediate) {
-      persistComposerWidth(pendingComposerWidthPx);
-      return;
-    }
-
-    composerWidthSaveTimer = window.setTimeout(() => {
-      composerWidthSaveTimer = 0;
-      persistComposerWidth(pendingComposerWidthPx);
-    }, 120);
+    chatWidthSetting.save(widthPx, true);
   }
 
   function handleComposerWidthInput() {
     const widthPx = sliderValueToWidth(composerWidthSlider.value);
     updateComposerWidthUi(widthPx);
-    queueComposerWidthSave(widthPx);
+    composerWidthSetting.save(widthPx);
   }
 
   function handleComposerWidthChange() {
     const widthPx = sliderValueToWidth(composerWidthSlider.value);
     updateComposerWidthUi(widthPx);
-    queueComposerWidthSave(widthPx, true);
+    composerWidthSetting.save(widthPx, true);
   }
 
   function persistMediaValue(key: string, value: unknown, successMessage: string) {
@@ -881,15 +845,13 @@
     try {
       storageArea.set({ [key]: value }, () => {
         if (getRuntimeErrorMessage()) {
-          setSettingsStatus("미디어 설정을 저장하지 못했습니다.", "error");
-          loadSettings();
+          reloadSettingsAfterSaveFailure("미디어 설정을 저장하지 못했습니다.");
           return;
         }
         setSettingsStatus(successMessage, "success");
       });
     } catch {
-      setSettingsStatus("미디어 설정을 저장하지 못했습니다.", "error");
-      loadSettings();
+      reloadSettingsAfterSaveFailure("미디어 설정을 저장하지 못했습니다.");
     }
   }
 
@@ -1135,22 +1097,19 @@
     try {
       storageArea.set(values, () => {
         if (getRuntimeErrorMessage()) {
-          setSettingsStatus("미디어 단축키를 되돌리지 못했습니다.", "error");
-          loadSettings();
+          reloadSettingsAfterSaveFailure("미디어 단축키를 되돌리지 못했습니다.");
           return;
         }
         setSettingsStatus("미디어 및 A/B 단축키를 S, D, R, Z, X, V, A, B 기본값으로 되돌렸습니다.", "success");
       });
     } catch {
-      setSettingsStatus("미디어 단축키를 되돌리지 못했습니다.", "error");
-      loadSettings();
+      reloadSettingsAfterSaveFailure("미디어 단축키를 되돌리지 못했습니다.");
     }
   }
 
   function saveAllPageUnlockSettings(enabled: boolean) {
     if (!storageArea || typeof storageArea.set !== "function") {
-      setSettingsStatus("설정을 저장할 수 없습니다.", "error");
-      loadSettings();
+      reloadSettingsAfterSaveFailure("설정을 저장할 수 없습니다.");
       return;
     }
 
@@ -1172,8 +1131,7 @@
     try {
       storageArea.set(nextValues, () => {
         if (getRuntimeErrorMessage()) {
-          setSettingsStatus("전체 설정을 저장하지 못했습니다.", "error");
-          loadSettings();
+          reloadSettingsAfterSaveFailure("전체 설정을 저장하지 못했습니다.");
           return;
         }
 
@@ -1186,8 +1144,7 @@
         );
       });
     } catch {
-      setSettingsStatus("전체 설정을 저장하지 못했습니다.", "error");
-      loadSettings();
+      reloadSettingsAfterSaveFailure("전체 설정을 저장하지 못했습니다.");
     }
   }
 
@@ -2288,14 +2245,14 @@
 
       if (Object.prototype.hasOwnProperty.call(changes, CHAT_WIDTH_STORAGE_KEY)) {
         const newWidth = changes[CHAT_WIDTH_STORAGE_KEY]?.newValue;
-        updateChatWidthUi(
+        chatWidthSetting.applyStored(
           typeof newWidth === "number" ? newWidth : CHAT_WIDTH_DEFAULT_PX
         );
       }
 
       if (Object.prototype.hasOwnProperty.call(changes, COMPOSER_WIDTH_STORAGE_KEY)) {
         const newWidth = changes[COMPOSER_WIDTH_STORAGE_KEY]?.newValue;
-        updateComposerWidthUi(
+        composerWidthSetting.applyStored(
           typeof newWidth === "number" ? newWidth : COMPOSER_WIDTH_DEFAULT_PX
         );
       }

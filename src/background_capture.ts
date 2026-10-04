@@ -137,6 +137,21 @@ async function verifySelectionDocument(tabId: number, documentId: string): Promi
   }
 }
 
+async function releaseCaptureDebugger(tabId: number, downloadStarted: boolean, captureError: unknown): Promise<void> {
+  if (await shouldKeepDebuggerAttachedAfterTemporaryOperation(tabId)) return;
+  try {
+    await detachExtensionDebugger(tabId);
+  } catch (error) {
+    const resultMessage = downloadStarted
+      ? "이미지 다운로드는 시작했습니다. "
+      : captureError ? `${makeUserMessage(captureError, "화면 캡처에 실패했습니다.")} ` : "";
+    throw new Error(
+      `${resultMessage}캡처 후 디버거 연결을 해제하지 못했습니다. 탭에 디버거 연결이 남아 있을 수 있습니다.`,
+      { cause: error }
+    );
+  }
+}
+
 async function captureFullPage(tabId: number) {
   const tab = await getTab(tabId);
   validateTab(tab);
@@ -148,9 +163,11 @@ async function captureFullPage(tabId: number) {
   const navigation = watchCaptureNavigation(tab);
   capturingTabs.add(tab.id);
   try {
-    return await queueTabDebuggerOperation(tab.id, async () => {
+    const result = await queueTabDebuggerOperation(tab.id, async () => {
       const target = { tabId: tab.id };
       let debuggerReady = false;
+      let downloadStarted = false;
+      let captureError: unknown;
 
       try {
         navigation.assertCurrent();
@@ -193,14 +210,19 @@ async function captureFullPage(tabId: number) {
           tab.url
         );
 
-        await setBadge(tab.id, "OK", "#15803d", BADGE_CLEAR_DELAY_MS);
+        downloadStarted = true;
         return { ...saved, width, height };
+      } catch (error) {
+        captureError = error;
+        throw error;
       } finally {
-        if (debuggerReady && !await shouldKeepDebuggerAttachedAfterTemporaryOperation(tab.id)) {
-          await detachExtensionDebugger(tab.id).catch(() => {});
+        if (debuggerReady) {
+          await releaseCaptureDebugger(tab.id, downloadStarted, captureError);
         }
       }
     });
+    await setBadge(tab.id, "OK", "#15803d", BADGE_CLEAR_DELAY_MS);
+    return result;
   } finally {
     navigation.dispose();
     capturingTabs.delete(tab.id);
@@ -217,9 +239,11 @@ async function captureSelection(tab: BrowserTab, rectangle: Parameters<typeof no
   const navigation = watchCaptureNavigation(tab);
   capturingTabs.add(tab.id);
   try {
-    return await queueTabDebuggerOperation(tab.id, async () => {
+    const result = await queueTabDebuggerOperation(tab.id, async () => {
       const target = { tabId: tab.id };
       let debuggerReady = false;
+      let downloadStarted = false;
+      let captureError: unknown;
 
       try {
         navigation.assertCurrent();
@@ -258,14 +282,19 @@ async function captureSelection(tab: BrowserTab, rectangle: Parameters<typeof no
           tab.url
         );
 
-        await setBadge(tab.id, "OK", "#15803d", BADGE_CLEAR_DELAY_MS);
+        downloadStarted = true;
         return { ok: true, ...saved, clip };
+      } catch (error) {
+        captureError = error;
+        throw error;
       } finally {
-        if (debuggerReady && !await shouldKeepDebuggerAttachedAfterTemporaryOperation(tab.id)) {
-          await detachExtensionDebugger(tab.id).catch(() => {});
+        if (debuggerReady) {
+          await releaseCaptureDebugger(tab.id, downloadStarted, captureError);
         }
       }
     });
+    await setBadge(tab.id, "OK", "#15803d", BADGE_CLEAR_DELAY_MS);
+    return result;
   } finally {
     navigation.dispose();
     capturingTabs.delete(tab.id);

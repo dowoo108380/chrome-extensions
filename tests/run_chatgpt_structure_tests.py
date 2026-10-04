@@ -103,6 +103,41 @@ try:
   for key in ['conversation','composer','form','editor']:
    assert untouched[key]==native[key],(key,untouched,native)
   record('unsupported_relationship_not_guessed', {'withSheets':untouched,'native':native})
+  p.close()
+  # Live 2026-10-04 layout: the same lanes now use variable-based inline padding.
+  # Verify geometry with the native 808px carrier, independent settings, and reset.
+  p=load(b,responsivePadding=True,nestedLimit=True)
+  update(p,0,0);native=measure(p)
+  assert native['conversation']['width']==native['composer']['width']==808,native
+  update(p,2000,2000);g=measure(p)
+  assert g['conversation']['width']==g['composer']['width']==2000,g
+  assert g['message']['width']==g['form']['width']==1960 and g['overflow']==0,g
+  assert len(report(p)['conversation'])==len(report(p)['composer'])==1
+  record('responsive_inline_padding_live_layout_expands_both_lanes',{'native':native,'configured':g})
+  for a,c in [(1280,1040),(0,2000),(2000,0),(640,1600),(0,0)]:
+   update(p,a,c);g=measure(p)
+   assert g['conversation']['width']==(a or 808) and g['composer']['width']==(c or 808),g
+   assert g['form']['width']==(c or 808)-40,g
+  assert g['sheets']==[] and g['nativeBodyVariable']==native['nativeBodyVariable']
+  record('responsive_inline_padding_independent_settings_and_reset')
+  update(p,2000,1600)
+  for width in [360,900,1920,3072]:
+   p.set_viewport_size({'width':width,'height':1000});settle(p);g=measure(p)
+   assert abs(g['conversation']['width']-min(2000,g['host']['width']))<1,g
+   assert abs(g['composer']['width']-min(1600,g['host']['width']))<1 and g['overflow']==0,g
+  p.evaluate('__reportedWidthFixture.build({responsivePadding:true})');settle(p)
+  assert measure(p)['conversation']['width']==2000 and measure(p)['composer']['width']==1600
+  # A sticky footer uses the same carrier token but is outside either lane.
+  p.evaluate('''() => {
+    const f=__reportedWidthFixture.refs;
+    const grid=document.createElement('div'),sticky=document.createElement('div');
+    const footer=f.conversation.cloneNode(false);footer.textContent='Fixture footer';
+    grid.className='grid';sticky.className='sticky bottom-0';
+    sticky.append(footer);grid.append(sticky);f.flow.append(grid);f.footer=footer;
+  }''');settle(p)
+  assert p.evaluate('__reportedWidthFixture.refs.footer.getBoundingClientRect().width')==808
+  assert len(report(p)['conversation'])==len(report(p)['composer'])==1
+  record('responsive_inline_padding_responsive_replacement_and_footer_scope')
   p.close();b.close()
  assert not result['errors'],result['errors'];result['passed']=True
 except Exception:

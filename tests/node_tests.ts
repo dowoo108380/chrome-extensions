@@ -87,6 +87,94 @@ for (const kind of ['full', 'selection']) for (const phase of ['queued', 'queued
   });
 }
 
+async function captureCleanupFixture(kind: string) {
+  const b = background(); await b.run('ensureTabKeepActiveInitialized()');
+  b.context.console = { ...console, error: () => {} };
+  b.chrome.scripting.executeScript = (_options: Obj, cb: (result: Obj[]) => void) => cb([{frameId:0,documentId:'selection-document',result:true}]);
+  b.run(`captureCleanupProbe={events:[],keep:false,failCapture:false};
+    getTab=async()=>({id:8,url:'https://capture.test/page'});
+    setBadge=async(_id,text)=>{captureCleanupProbe.events.push(text)};
+    ensureExtensionDebuggerAttached=async()=>{extensionAttachedDebuggerTabs.add(8)};
+    shouldKeepDebuggerAttachedAfterTemporaryOperation=async()=>captureCleanupProbe.keep;
+    sendCommand=async(_target,method)=>{
+      if(method==='Page.getFrameTree')return {frameTree:{frame:{id:'main',loaderId:'document',url:'https://capture.test/page'}}};
+      if(method==='Page.getLayoutMetrics')return {cssContentSize:{width:800,height:600}};
+      if(method==='Page.captureScreenshot'){
+        if(captureCleanupProbe.failCapture)throw new Error('Injected screenshot failure');
+        return {data:'test-png'};
+      }
+      return {};
+    };
+    saveScreenshot=async()=>{captureCleanupProbe.events.push('download');return {filename:'capture.png',downloadId:1}};`);
+  const probe = b.context.captureCleanupProbe as Obj;
+  const request = () => kind === 'full'
+    ? b.message({type:'capture-full-page',tabId:8}, {id:b.chrome.runtime.id,url:b.chrome.runtime.getURL('popup.html')})
+    : b.message({type:'drag-area-screenshot:capture',rectangle:{x:0,y:0,width:300,height:200}},
+      {id:b.chrome.runtime.id,tab:{id:8,url:'https://capture.test/page'},frameId:0,documentId:'selection-document'});
+  return { b, probe, request };
+}
+
+for (const kind of ['full', 'selection']) {
+  for (const failCapture of [false, true]) test(`${kind} capture reports cleanup failure and retains debugger ownership (capture failure: ${failCapture})`, async () => {
+    const { b, probe, request } = await captureCleanupFixture(kind);
+    const listenerCount = b.chrome.tabs.onUpdated.listeners.length;
+    probe.failCapture = failCapture;
+    b.chrome.debugger.detach = (_target: Obj, cb: () => void) => {
+      probe.events.push('detach');
+      b.chrome.runtime.lastError = { message: 'Injected detach failure' };
+      try { cb(); } finally { delete b.chrome.runtime.lastError; }
+    };
+    const response = await request();
+    assert.equal(response.ok, false);
+    assert.match(response.error, /디버거.*해제/);
+    assert.match(response.error, failCapture ? /Injected screenshot failure/ : /다운로드.*시작/);
+    assert.ok(!probe.events.includes('OK'));
+    assert.equal(probe.events.at(-1), 'ERR');
+    assert.equal(b.run('extensionAttachedDebuggerTabs.has(8)'), true);
+    assert.equal(b.run('expectedDebuggerDetaches.size'), 0);
+    assert.equal(b.run('capturingTabs.size'), 0);
+    assert.equal(b.chrome.tabs.onUpdated.listeners.length, listenerCount);
+    b.chrome.debugger.detach = (_target: Obj, cb: () => void) => cb();
+    await b.run('detachExtensionDebugger(8)');
+    assert.equal(b.run('extensionAttachedDebuggerTabs.has(8)'), false);
+  });
+
+  test(`${kind} capture publishes success only after debugger cleanup completes`, async () => {
+    const { b, probe, request } = await captureCleanupFixture(kind);
+    const detaching = gate(); let finishDetach!: () => void;
+    b.chrome.debugger.detach = (_target: Obj, cb: () => void) => {
+      probe.events.push('detach'); finishDetach = cb; detaching.resolve();
+    };
+    const response = request(); await detaching.promise;
+    assert.ok(!probe.events.includes('OK'));
+    finishDetach();
+    assert.equal((await response).ok, true);
+    assert.deepEqual(plain(probe.events), ['...', 'download', 'detach', 'OK']);
+    assert.equal(b.run('extensionAttachedDebuggerTabs.has(8)'), false);
+  });
+
+  for (const message of ['Debugger is not attached to the tab', 'Target closed']) {
+    test(`${kind} capture accepts confirmed debugger absence: ${message}`, async () => {
+      const { b, request } = await captureCleanupFixture(kind);
+      b.chrome.debugger.detach = (_target: Obj, cb: () => void) => {
+        b.chrome.runtime.lastError = { message };
+        try { cb(); } finally { delete b.chrome.runtime.lastError; }
+      };
+      assert.equal((await request()).ok, true);
+      assert.equal(b.run('extensionAttachedDebuggerTabs.has(8)'), false);
+      assert.equal(b.run('expectedDebuggerDetaches.size'), 0);
+    });
+  }
+
+  test(`${kind} capture preserves a debugger still required by keep-active`, async () => {
+    const { b, probe, request } = await captureCleanupFixture(kind);
+    probe.keep = true;
+    b.chrome.debugger.detach = () => { throw new Error('Keep-active debugger must remain attached'); };
+    assert.equal((await request()).ok, true);
+    assert.equal(b.run('extensionAttachedDebuggerTabs.has(8)'), true);
+  });
+}
+
 test('selection capture rejects an old document even when its URL is unchanged', async () => {
   const b = background(); await b.run('ensureTabKeepActiveInitialized()');
   const listenerCount = b.chrome.tabs.onUpdated.listeners.length;

@@ -10,6 +10,8 @@
   const w = globalThis as unknown as Record<string, any>;
   const bodyToken = 'max-w-(--thread-body-max-width)';
   const contentToken = 'max-w-(--thread-content-max-width)';
+  // Observed on the live conversation page on 2026-10-04; replaces px-toolbar.
+  const responsivePaddingToken = 'px-[var(--thread-body-inline-padding,var(--padding-toolbar))]';
   const carrierClasses = `relative flex flex-col mx-auto w-full ${bodyToken} px-toolbar`;
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, classes = '', text = ''): HTMLElementTagNameMap[K] => {
     const e = document.createElement(tag); e.className = classes; e.textContent = text; return e;
@@ -29,6 +31,10 @@
     .overflow-y-auto{overflow-y:auto}.overflow-x-hidden{overflow-x:hidden}.overflow-x-clip{overflow-x:clip}.overflow-hidden{overflow:hidden}
     .contents{display:contents}.px-toolbar{padding-inline:16px}
     [class~="${bodyToken}"] { max-width:var(--thread-body-max-width); }
+    [class~="${responsivePaddingToken}"] {
+      --thread-body-max-width:calc(var(--thread-content-max-width) + var(--thread-body-inline-padding,20px) * 2);
+      padding-inline:var(--thread-body-inline-padding,var(--padding-toolbar,20px));
+    }
     [class~="${contentToken}"] { max-width:var(--thread-content-max-width); width:100%; margin-inline:auto; }
     .fixture-thread-flow {padding-top:40px;padding-bottom:130px;}
     .fixture-dock {bottom:20px;left:0;right:0;}
@@ -46,8 +52,9 @@
   document.head.append(style);
   let refs: Record<string, HTMLElement> = {};
   let fileSelections = 0;
-  const build = (options: {outsideMain?: boolean; nestedLimit?: boolean; empty?: boolean} = {}): void => {
+  const build = (options: {outsideMain?: boolean; nestedLimit?: boolean; empty?: boolean; responsivePadding?: boolean} = {}): void => {
     document.body.replaceChildren();refs={};fileSelections=0;
+    const widthClasses = options.responsivePadding ? carrierClasses.replace('px-toolbar', responsivePaddingToken) : carrierClasses;
     const shell=el('div','fixture-shell');
     const side=el('aside','fixture-sidebar','Browser Toolbox\n구조 진단 기반 · 로컬 시험');
     const host=el('div','fixture-host');
@@ -55,7 +62,7 @@
     const position=el('div','relative h-full flex-1 min-w-0');
     const scroll=el('div','overflow-x-hidden overflow-y-auto h-full flex flex-col-reverse');scroll.setAttribute('role','presentation');
     const flow=el('div','flex min-h-full flex-col overflow-x-clip fixture-thread-flow');
-    const conversation=el('div',carrierClasses+' flex-1');
+    const conversation=el('div',widthClasses+' flex-1');
     const proseContainer=el('div',options.nestedLimit?contentToken:'');
     if(!options.empty) for(let i=0;i<4;i++){
       const message=el('section','fixture-message');
@@ -64,7 +71,7 @@
       proseContainer.append(message);
     }
     conversation.append(proseContainer);flow.append(conversation);
-    const dock=el('div','absolute fixture-dock');const composer=el('div',carrierClasses+' extension:px-2');
+    const dock=el('div','absolute fixture-dock');const composer=el('div',widthClasses+' extension:px-2');
     let parent:HTMLElement=composer;
     for(let i=0;i<5;i++){const wrapper=el('div','contents');parent.append(wrapper);parent=wrapper;}
     const form=el('form','relative flex flex-col');parent.append(form);
