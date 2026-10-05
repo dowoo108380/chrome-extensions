@@ -163,6 +163,8 @@
   const mediaSeekStepInput = document.getElementById("media-seek-step-input") as HTMLInputElement;
   const mediaResetFallbackRateInput = document.getElementById("media-reset-fallback-rate-input") as HTMLInputElement;
   const mediaRateResetButton = document.getElementById("media-rate-reset") as HTMLButtonElement;
+  const mediaRatePresetButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-media-rate-preset]"));
+  const mediaRateStepButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-media-rate-step]"));
   const mediaOverlayPositionResetButton = document.getElementById("media-overlay-position-reset") as HTMLButtonElement;
   const mediaShortcutResetButton = document.getElementById("media-shortcut-reset") as HTMLButtonElement;
   const mediaShortcutHint = document.getElementById("media-shortcut-hint") as HTMLElement;
@@ -288,6 +290,9 @@
     mediaRateSlider.disabled = !enabled;
     mediaRateInput.disabled = !enabled;
     mediaRateResetButton.disabled = !enabled;
+    for (const button of [...mediaRatePresetButtons, ...mediaRateStepButtons]) {
+      button.disabled = !enabled;
+    }
   }
 
   function normalizeWidthPx(value: unknown, fallbackPx: number) {
@@ -505,6 +510,9 @@
     mediaRateSlider.value = String(Math.round(normalizedRate * 100));
     mediaRateSlider.setAttribute("aria-valuetext", formatMediaRate(normalizedRate));
     mediaRateInput.value = normalizedRate.toFixed(2);
+    for (const button of mediaRatePresetButtons) {
+      button.setAttribute("aria-pressed", String(normalizeMediaRate(button.dataset.mediaRatePreset) === normalizedRate));
+    }
     updateMediaSummary();
   }
 
@@ -1012,6 +1020,19 @@
   function resetMediaRate() {
     updateMediaRateUi(1);
     queueMediaRateSave(1, true);
+  }
+
+  function applyMediaRatePreset(button: HTMLButtonElement) {
+    const rate = normalizeMediaRate(button.dataset.mediaRatePreset);
+    updateMediaRateUi(rate);
+    queueMediaRateSave(rate, true);
+  }
+
+  function stepMediaRate(button: HTMLButtonElement) {
+    const step = normalizeMediaSpeedStep(mediaSpeedStepInput.value) * Math.sign(Number(button.dataset.mediaRateStep));
+    const rate = normalizeMediaRate(Math.round((pendingMediaRate + step) * 100) / 100);
+    updateMediaRateUi(rate);
+    queueMediaRateSave(rate, true);
   }
 
   function resetMediaOverlayPosition() {
@@ -2179,6 +2200,12 @@
   mediaSeekStepInput.addEventListener("change", handleMediaSeekStepChange);
   mediaResetFallbackRateInput.addEventListener("change", handleMediaResetFallbackRateChange);
   mediaRateResetButton.addEventListener("click", resetMediaRate);
+  for (const button of mediaRatePresetButtons) {
+    button.addEventListener("click", () => applyMediaRatePreset(button));
+  }
+  for (const button of mediaRateStepButtons) {
+    button.addEventListener("click", () => stepMediaRate(button));
+  }
   mediaOverlayPositionResetButton.addEventListener("click", resetMediaOverlayPosition);
   mediaShortcutResetButton.addEventListener("click", resetMediaShortcuts);
   for (const [command, button] of mediaShortcutButtons) {

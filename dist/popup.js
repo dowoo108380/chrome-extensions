@@ -106,6 +106,8 @@
     const mediaSeekStepInput = document.getElementById("media-seek-step-input");
     const mediaResetFallbackRateInput = document.getElementById("media-reset-fallback-rate-input");
     const mediaRateResetButton = document.getElementById("media-rate-reset");
+    const mediaRatePresetButtons = Array.from(document.querySelectorAll("[data-media-rate-preset]"));
+    const mediaRateStepButtons = Array.from(document.querySelectorAll("[data-media-rate-step]"));
     const mediaOverlayPositionResetButton = document.getElementById("media-overlay-position-reset");
     const mediaShortcutResetButton = document.getElementById("media-shortcut-reset");
     const mediaShortcutHint = document.getElementById("media-shortcut-hint");
@@ -219,6 +221,9 @@
         mediaRateSlider.disabled = !enabled;
         mediaRateInput.disabled = !enabled;
         mediaRateResetButton.disabled = !enabled;
+        for (const button of [...mediaRatePresetButtons, ...mediaRateStepButtons]) {
+            button.disabled = !enabled;
+        }
     }
     function normalizeWidthPx(value, fallbackPx) {
         const numericValue = ToolboxShared.numericSetting(value);
@@ -380,6 +385,9 @@
         mediaRateSlider.value = String(Math.round(normalizedRate * 100));
         mediaRateSlider.setAttribute("aria-valuetext", formatMediaRate(normalizedRate));
         mediaRateInput.value = normalizedRate.toFixed(2);
+        for (const button of mediaRatePresetButtons) {
+            button.setAttribute("aria-pressed", String(normalizeMediaRate(button.dataset.mediaRatePreset) === normalizedRate));
+        }
         updateMediaSummary();
     }
     function updateMediaSpeedStepUi(step) {
@@ -801,6 +809,17 @@
     function resetMediaRate() {
         updateMediaRateUi(1);
         queueMediaRateSave(1, true);
+    }
+    function applyMediaRatePreset(button) {
+        const rate = normalizeMediaRate(button.dataset.mediaRatePreset);
+        updateMediaRateUi(rate);
+        queueMediaRateSave(rate, true);
+    }
+    function stepMediaRate(button) {
+        const step = normalizeMediaSpeedStep(mediaSpeedStepInput.value) * Math.sign(Number(button.dataset.mediaRateStep));
+        const rate = normalizeMediaRate(Math.round((pendingMediaRate + step) * 100) / 100);
+        updateMediaRateUi(rate);
+        queueMediaRateSave(rate, true);
     }
     function resetMediaOverlayPosition() {
         persistMediaValue(MEDIA_STORAGE_KEYS.overlayPosition, { ...MEDIA_DEFAULTS[MEDIA_STORAGE_KEYS.overlayPosition] }, "영상 위 속도 표시창을 가운데 위로 되돌렸습니다.");
@@ -1788,6 +1807,12 @@
     mediaSeekStepInput.addEventListener("change", handleMediaSeekStepChange);
     mediaResetFallbackRateInput.addEventListener("change", handleMediaResetFallbackRateChange);
     mediaRateResetButton.addEventListener("click", resetMediaRate);
+    for (const button of mediaRatePresetButtons) {
+        button.addEventListener("click", () => applyMediaRatePreset(button));
+    }
+    for (const button of mediaRateStepButtons) {
+        button.addEventListener("click", () => stepMediaRate(button));
+    }
     mediaOverlayPositionResetButton.addEventListener("click", resetMediaOverlayPosition);
     mediaShortcutResetButton.addEventListener("click", resetMediaShortcuts);
     for (const [command, button] of mediaShortcutButtons) {

@@ -87,6 +87,7 @@
   let highlight: HTMLElement | null = null;
   let highlightTimer = 0;
   let matches: readonly SearchItem[] = [];
+  let userNavigated = false;
 
   function enterCurrentSection(): void {
     const panel = document.getElementById(`view-${activeSection}`);
@@ -143,6 +144,7 @@
   }
   function selectResult(item: SearchItem): void {
     closeSearch(); input!.value = "";
+    userNavigated = true;
     activate(item.section); pendingTarget = item; enterCurrentSection();
   }
   function normalize(text: string): string { return text.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, ""); }
@@ -166,6 +168,7 @@
   nav.addEventListener("click", event => {
     const button = (event.target as Element).closest<HTMLButtonElement>("button[data-section]");
     if (!button || !nav.contains(button)) return;
+    userNavigated = true;
     closeSearch(); activate(button.dataset.section as Section);
   });
   nav.addEventListener("keydown", event => {
@@ -241,4 +244,19 @@
     catch { version.textContent = "버전을 확인할 수 없습니다."; }
   }
   activate("media");
+  // Show which tab the tools act on; on ChatGPT, open its own settings first.
+  const context = document.getElementById("popup-context");
+  const contextHost = document.getElementById("popup-context-host");
+  try {
+    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+      if (chrome.runtime.lastError || !context || !contextHost) return;
+      let url: URL;
+      try { url = new URL(tabs?.[0]?.url ?? ""); } catch { return; }
+      const web = url.protocol === "http:" || url.protocol === "https:";
+      contextHost.textContent = web ? url.hostname.replace(/^www\./, "") : url.protocol === "file:" ? "로컬 파일" : "브라우저 페이지";
+      context.dataset.web = String(web);
+      context.hidden = false;
+      if (!userNavigated && url.hostname === "chatgpt.com") activate("chat");
+    });
+  } catch { /* The tab context is informational only. */ }
 })();

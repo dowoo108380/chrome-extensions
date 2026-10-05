@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Ctrl+Enter, Screenshot, Tab URL & Page Tools",
-  "version": "2.0.2",
+  "version": "2.2.0",
   "description": "Browser toolbox for ChatGPT, media, YouTube captions, A/B looping and optional layout tools, screenshots and tabs.",
   "permissions": [
     "storage",

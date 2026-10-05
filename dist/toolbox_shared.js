@@ -40,14 +40,14 @@ var ToolboxShared;
     ToolboxShared.captionRequest = captionRequest;
     /** YouTube enhancements are opt-in. All are plain DOM/CSS features, not player-state overrides. */
     ToolboxShared.YOUTUBE_FEATURES = Object.freeze([
-        { key: "youtubeLayoutTabsEnabled", label: "오른쪽 탭형 패널", description: "기존 설명·댓글·관련 동영상을 탭으로 정리합니다. 라이브에서는 댓글 대신 실시간 채팅을 표시하며, 실제 재생목록이 있으면 동영상 앞에 추가합니다.", group: "layout" },
-        { key: "youtubeDescriptionExpandedEnabled", label: "영상 설명 자동 펼치기", description: "확인된 설명의 더보기 버튼으로 펼칩니다. 직접 접으면 다시 펼치지 않습니다.", group: "layout" },
-        { key: "youtubeCommentStatusEnabled", label: "댓글 수와 상태 표시", description: "댓글 탭에 YouTube가 표시한 댓글 수나 안내 문구를 표시합니다.", group: "layout", dependsOn: "youtubeLayoutTabsEnabled" },
-        { key: "youtubePanelScrollEnabled", label: "패널 내부 스크롤", description: "탭 내용만 스크롤합니다. 좁은 창에서는 기존 한 열 배치를 유지합니다.", group: "layout", dependsOn: "youtubeLayoutTabsEnabled" },
-        { key: "youtubeNativePanelsEnabled", label: "채팅·부가 패널과 배치 연동", description: "외부 YouTube 패널이 열리면 공간을 양보합니다. 탭 안에 연결한 채팅·재생목록에는 적용하지 않습니다.", group: "layout", dependsOn: "youtubeLayoutTabsEnabled" },
-        { key: "youtubeFullChannelNameEnabled", label: "긴 채널 이름 펼쳐 보기", description: "채널 정보에 마우스를 올리거나 키보드로 선택하면 이름의 줄바꿈을 허용합니다.", group: "layout" },
+        { key: "youtubeLayoutTabsEnabled", label: "오른쪽 탭형 패널", description: "설명·댓글·관련 동영상을 탭으로 정리합니다. 라이브는 실시간 채팅, 재생목록도 함께 표시합니다.", group: "layout" },
+        { key: "youtubeDescriptionExpandedEnabled", label: "영상 설명 자동 펼치기", description: "더보기를 자동으로 누릅니다. 직접 접으면 다시 펼치지 않습니다.", group: "layout" },
+        { key: "youtubeCommentStatusEnabled", label: "댓글 수와 상태 표시", description: "댓글 탭에 댓글 수나 안내 문구를 표시합니다.", group: "layout", dependsOn: "youtubeLayoutTabsEnabled" },
+        { key: "youtubePanelScrollEnabled", label: "패널 내부 스크롤", description: "탭 내용만 스크롤합니다. 좁은 창에서는 꺼집니다.", group: "layout", dependsOn: "youtubeLayoutTabsEnabled" },
+        { key: "youtubeNativePanelsEnabled", label: "채팅·부가 패널과 배치 연동", description: "YouTube 자체 채팅·부가 패널이 열리면 공간을 양보합니다.", group: "layout", dependsOn: "youtubeLayoutTabsEnabled" },
+        { key: "youtubeFullChannelNameEnabled", label: "긴 채널 이름 펼쳐 보기", description: "마우스를 올리면 잘린 채널 이름을 모두 보여 줍니다.", group: "layout" },
         { key: "youtubeSpeedNoticeEnabled", label: "배속 변경 알림", description: "실제로 바뀐 배속을 영상 중앙에 잠깐 표시합니다.", group: "player", dependsOn: "mediaControllerEnabled" },
-        { key: "youtubeProgressThemeEnabled", label: "무지개 진행 막대와 픽셀 고양이", description: "원본의 무지개 진행률·애니메이션·고양이 손잡이를 적용합니다. 탐색 동작은 바꾸지 않습니다.", group: "player" }
+        { key: "youtubeProgressThemeEnabled", label: "무지개 진행 막대와 픽셀 고양이", description: "진행 막대 장식만 바꾸고 탐색 동작은 그대로 둡니다.", group: "player" }
     ]);
     ToolboxShared.YOUTUBE_DEFAULTS = Object.freeze(Object.fromEntries(ToolboxShared.YOUTUBE_FEATURES.map(f => [f.key, false])));
     ToolboxShared.YOUTUBE_STATUS_MESSAGE = "youtube-layout:get-status";
